@@ -1,0 +1,3 @@
+[mcp_servers."hackathon-mode"]
+command = "npx"
+args = ["-y", "hackathon-mode@latest"]
