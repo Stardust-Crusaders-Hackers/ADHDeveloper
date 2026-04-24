@@ -1,0 +1,7 @@
+<idea-plugin>
+  <id>com.example.mcpassistant</id>
+  <name>MCP Assistant</name>
+  <vendor>ADHDeveloper</vendor>
+  <description>Plugin para detectar agentes IA y proporcionar UI integrada en IntelliJ.</description>
+  <!-- Extensiones y actions se añadirán durante el desarrollo -->
+</idea-plugin>
