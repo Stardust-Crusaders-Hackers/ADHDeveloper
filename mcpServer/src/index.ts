@@ -5,6 +5,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
+import { setupProject } from "./tools/setupProject.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,6 +61,20 @@ async function main() {
       const summaries = registry.getAgentSummaries();
       return {
         content: [{ type: "text" as const, text: JSON.stringify(summaries, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "setup_project",
+    "Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
+    },
+    async ({ projectPath }) => {
+      const result = await setupProject(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
     }
   );

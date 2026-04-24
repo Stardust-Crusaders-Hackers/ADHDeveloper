@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(echo \"EXIT:$?\")",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "Bash(npm run *)",
+      "Read(//c/Temp/**)",
+      "Read(//c/Temp/mcp-test/**)",
+      "Read(//c/Temp/mcp-test/.vscode/**)",
+      "Read(//c/Temp/mcp-test/.codex/**)",
+      "Bash(echo '{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}} *)",
+      "Bash(node /c/code/MCP/ADHDeveloper/mcpServer/dist/index.js)"
     ]
   }
 }
