@@ -9,7 +9,12 @@
       "Read(//c/Temp/mcp-test/.vscode/**)",
       "Read(//c/Temp/mcp-test/.codex/**)",
       "Bash(echo '{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}} *)",
-      "Bash(node /c/code/MCP/ADHDeveloper/mcpServer/dist/index.js)"
+      "Bash(node /c/code/MCP/ADHDeveloper/mcpServer/dist/index.js)",
+      "WebSearch",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:www.jetbrains.com)",
+      "WebFetch(domain:junie.jetbrains.com)"
     ]
   }
 }
