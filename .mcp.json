@@ -1,8 +1,10 @@
 {
   "mcpServers": {
     "hackathon-mode": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "hackathon-mode@latest"
       ]
