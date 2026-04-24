@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "hackathon-mode": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "hackathon-mode@latest"
+      ]
+    }
+  }
+}
