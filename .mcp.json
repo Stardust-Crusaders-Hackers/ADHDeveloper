@@ -1,10 +1,18 @@
 {
   "mcpServers": {
     "hackathon-mode": {
-      "command": "npx",
+      "command": "cmd",
       "args": [
+        "/c",
+        "npx",
         "-y",
         "hackathon-mode@latest"
+      ]
+    },
+    "adhd-developer": {
+      "command": "node",
+      "args": [
+        "mcpServer/dist/index.js"
       ]
     }
   }
