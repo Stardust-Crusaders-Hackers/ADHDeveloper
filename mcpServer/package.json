@@ -2,29 +2,41 @@
   "name": "mcp-server",
   "version": "0.1.0",
   "description": "MCP server (TypeScript + Node)",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
     "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
+    "dev": "tsx src/index.ts"
   },
   "license": "MIT",
   "author": "ADHDeveloper",
   "contributors": [
-    { "name": "Andreea Cerchia" },
-    { "name": "Oriol Orbea Suari" }
+    {
+      "name": "Andreea Cerchia"
+    },
+    {
+      "name": "Oriol Orbea Suari"
+    }
   ],
   "publishConfig": {
     "access": "public"
   },
   "devDependencies": {
-    "ts-node-dev": "^2.0.0",
+    "@types/node": "^22.19.17",
+    "tsx": "^4.19.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "express": "^4.18.0"
+    "@modelcontextprotocol/sdk": "^1.10.0",
+    "zod": "^3.23.0"
   }
 }
