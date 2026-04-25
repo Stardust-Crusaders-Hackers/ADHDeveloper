@@ -112,9 +112,18 @@ async function main() {
       inputSchema: z.object({}),
     },
     async () => {
-      const summaries = registry.getAgentSummaries();
+      const fileSummaries = registry.getAgentSummaries();
+      const handlerAgents = listAgents().map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        description: a.description,
+        keywords: [] as string[],
+      }));
+      const seen = new Set(fileSummaries.map((s) => s.id));
+      const merged = [...fileSummaries, ...handlerAgents.filter((a) => !seen.has(a.id))];
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(summaries, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(merged, null, 2) }],
       };
     }
   );
@@ -175,9 +184,18 @@ async function main() {
       inputSchema: z.object({}),
     },
     async () => {
-      const summaries = registry.getAgentSummaries();
+      const fileSummaries = registry.getAgentSummaries();
+      const handlerAgents = listAgents().map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        description: a.description,
+        keywords: [] as string[],
+      }));
+      const seen = new Set(fileSummaries.map((s) => s.id));
+      const merged = [...fileSummaries, ...handlerAgents.filter((a) => !seen.has(a.id))];
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(summaries, null, 2) }],
+        content: [{ type: "text" as const, text: JSON.stringify(merged, null, 2) }],
       };
     }
   );
