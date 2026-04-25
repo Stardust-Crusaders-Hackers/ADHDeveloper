@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { AgentDefinition, AgentContext, AgentResult } from "../types.js";
+import { AgentDefinition, AgentContext, AgentResult, FilePatch } from "../types.js";
+import { buildPatch } from "../tools/patchUtils.js";
 
 // ─── Project detection ────────────────────────────────────────────────────────
 
@@ -371,11 +372,17 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
   const outputs: Record<string, string> = {};
   const written: string[] = [];
 
+  const patches: FilePatch[] = [];
   function maybeWrite(filename: string, content: string): void {
     outputs[filename] = content;
     if (writeFiles) {
-      fs.writeFileSync(path.join(projectRoot, filename), content, "utf-8");
+      const fullPath = path.join(projectRoot, filename);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      const existingRaw = fs.existsSync(fullPath) ? fs.readFileSync(fullPath, "utf-8") : "";
+      fs.writeFileSync(fullPath, content, "utf-8");
       written.push(filename);
+      const patch: FilePatch = buildPatch(fullPath, existingRaw, content);
+      patches.push(patch);
     }
   }
 
@@ -415,7 +422,7 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
   return {
     success: true,
     message: `Detected project: ${profile.type} | port: ${profile.port}${writtenMsg}${filesList}`,
-    data: { profile, files: Object.keys(outputs), written },
+    data: { profile, files: Object.keys(outputs), written, filePatches: patches },
   };
 }
 
