@@ -1,6 +1,17 @@
+export interface PresentationPayload {
+  presentationId: string;
+  agentId: string;
+  agentName: string;
+  agentType: string;
+  text: string;
+}
+
+export type PresentationEmitter = (payload: PresentationPayload) => void;
+
 export interface AgentContext {
   query: string;
   metadata?: Record<string, unknown>;
+  emit?: PresentationEmitter;
 }
 
 export interface FlowStepSummary {

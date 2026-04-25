@@ -6,6 +6,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
+import { PresentationEmitter } from "./types.js";
 import { enableMcp, disableMcp, setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
 import { explainSubdirectories } from "./tools/explainSubdirectories.js";
@@ -48,7 +49,13 @@ async function main() {
   const agentsDir = path.join(__dirname, "agents");
   await registry.discoverAgents(agentsDir);
 
-  const orchestrator = new Orchestrator(registry);
+  const emitter: PresentationEmitter = (payload) => {
+    void server.server.notification({
+      method: "notifications/presentation",
+      params: payload as unknown as Record<string, unknown>,
+    });
+  };
+  const orchestrator = new Orchestrator(registry, emitter);
 
   const server = new McpServer({
     name: "adhd-developer",

@@ -32,12 +32,9 @@ class MCPBridgeService(private val project: Project) : Disposable {
     private val mapper = jacksonObjectMapper()
     private val pollExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
 
-    private val knownAgentIds = mutableSetOf<String>()
-    private val knownPresentations = mutableMapOf<String, Long>()
+    private val knownAgentIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val seenPresentationIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private var activeTasksById = mutableMapOf<String, RunningAgentNode>()
-
-    // Shared state file written by any MCP server process (Junie, Claude, etc.)
-    private val stateFile = File(System.getProperty("java.io.tmpdir"), "adhd-bridge-state.json")
 
     private var mcpDir: File? = null
     private var mcpClient: StdioMcpClient? = null
@@ -51,11 +48,7 @@ class MCPBridgeService(private val project: Project) : Disposable {
     }
 
     private fun poll() {
-        val mcpOk = pollFromMcp()
-        if (!mcpOk) {
-            pollFromStateFile()
-        }
-        pruneSeenPresentations(System.currentTimeMillis())
+        pollFromMcp()
     }
 
     private fun pollFromMcp(): Boolean {
@@ -102,72 +95,21 @@ class MCPBridgeService(private val project: Project) : Disposable {
             }
 
         activeTasksById = current.toMutableMap()
-
-        snapshot.recentClosedPresentations
-            .sortedBy { it.createdAt }
-            .forEach { event ->
-                if (knownPresentations.containsKey(event.eventId)) return@forEach
-                ensureAgentRegistered(event.agentId)
-                registry.stagePresentation(event.eventId, event.agentId, event.text)
-                knownPresentations[event.eventId] = event.createdAt
-            }
     }
 
-    private fun pollFromStateFile() {
-        if (!stateFile.exists()) return
-        try {
-            val state = mapper.readValue<BridgeState>(stateFile)
-
-            state.agents.forEach { node ->
-                if (knownAgentIds.add(node.id)) {
-                    registry.registerAgent(
-                        Agent(
-                            id = node.id,
-                            name = node.name,
-                            type = node.type,
-                            description = node.description,
-                        )
-                    )
-                }
+    private fun handleServerNotification(method: String, params: JsonNode) {
+        when (method) {
+            "notifications/presentation" -> {
+                val id        = params.path("presentationId").asText().ifBlank { return }
+                val agentId   = params.path("agentId").asText().ifBlank { return }
+                val agentName = params.path("agentName").asText()
+                val agentType = params.path("agentType").asText()
+                val text      = params.path("text").asText().ifBlank { return }
+                if (!seenPresentationIds.add(id)) return
+                if (knownAgentIds.add(agentId))
+                    registry.registerAgent(Agent(id = agentId, name = agentName, type = agentType, description = ""))
+                registry.stagePresentation(id, agentId, text)
             }
-
-            state.tasks.filter { it.status == "ACTIVE" }.forEach { node ->
-                ensureAgentRegistered(node.agentId)
-                if (!activeTasksById.containsKey(node.taskId)) {
-                    activeTasksById[node.taskId] = RunningAgentNode(
-                        taskId = node.taskId,
-                        flowId = "fallback-json",
-                        agentName = node.agentId,
-                        startedAt = System.currentTimeMillis(),
-                    )
-                    registry.startTask(
-                        AgentTask(
-                            taskId = node.taskId,
-                            agentId = node.agentId,
-                            description = node.description,
-                            status = TaskStatus.ACTIVE,
-                            result = node.result,
-                        )
-                    )
-                }
-            }
-
-            state.tasks.filter { it.status == "COMPLETED" }.forEach { node ->
-                if (activeTasksById.remove(node.taskId) != null) {
-                    registry.completeTask(node.taskId, node.agentId, node.result)
-                }
-            }
-
-            state.presentations.filter { it.status == "PENDING" }.forEach { node ->
-                if (knownPresentations.containsKey(node.presentationId)) return@forEach
-                ensureAgentRegistered(node.agentId)
-                registry.stagePresentation(node.presentationId, node.agentId, node.text)
-                knownPresentations[node.presentationId] = node.createdAt.takeIf { it > 0 } ?: System.currentTimeMillis()
-                // Mark as SHOWN in the file so it doesn't fire again
-                ackPresentation(node.presentationId, state)
-            }
-        } catch (_: Exception) {
-            // fallback is best-effort; keep polling
         }
     }
 
@@ -189,30 +131,6 @@ class MCPBridgeService(private val project: Project) : Disposable {
         return min(30_000L, 1_000L * exponential)
     }
 
-    private fun pruneSeenPresentations(now: Long) {
-        val ttlMs = 2 * 60 * 1000L
-        val iter = knownPresentations.entries.iterator()
-        while (iter.hasNext()) {
-            val entry = iter.next()
-            if (now - entry.value > ttlMs) {
-                iter.remove()
-            }
-        }
-    }
-
-    private fun ackPresentation(presentationId: String, state: BridgeState) {
-        try {
-            val updated = state.copy(
-                presentations = state.presentations.map {
-                    if (it.presentationId == presentationId) it.copy(status = "SHOWN") else it
-                }
-            )
-            stateFile.writeText(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(updated))
-        } catch (_: Exception) {
-            // best effort
-        }
-    }
-
     fun callTool(name: String, arguments: Map<String, Any>) {
         // Reserved for future explicit bridge calls.
     }
@@ -227,7 +145,9 @@ class MCPBridgeService(private val project: Project) : Disposable {
         if (existing != null && existing.isAlive()) return existing
 
         val distEntry = File(dir, "dist/index.js")
-        val created = StdioMcpClient(mapper, dir, distEntry)
+        val created = StdioMcpClient(mapper, dir, distEntry) { method, params ->
+            handleServerNotification(method, params)
+        }
         created.connect()
         mcpClient = created
         return created
@@ -238,21 +158,10 @@ class MCPBridgeService(private val project: Project) : Disposable {
         mcpClient = null
     }
 
-    data class BridgeState(
-        val agents: List<AgentNode> = emptyList(),
-        val tasks: List<TaskNode> = emptyList(),
-        val presentations: List<PresentationNode> = emptyList(),
-    )
-
-    data class AgentNode(val id: String, val name: String, val type: String, val description: String)
-    data class TaskNode(val taskId: String, val agentId: String, val description: String, val status: String, val result: String)
-    data class PresentationNode(val presentationId: String, val agentId: String, val text: String, val status: String, val createdAt: Long = 0)
-
     data class FlowStateSnapshot(
         val activeFlows: Int = 0,
         val flows: List<FlowNode> = emptyList(),
         val runningAgents: List<RunningAgentNode> = emptyList(),
-        val recentClosedPresentations: List<ClosedPresentationNode> = emptyList(),
         val timestamp: Long = 0,
     )
 
@@ -272,18 +181,11 @@ class MCPBridgeService(private val project: Project) : Disposable {
         val startedAt: Long,
     )
 
-    data class ClosedPresentationNode(
-        val eventId: String,
-        val flowId: String,
-        val agentId: String,
-        val text: String,
-        val createdAt: Long,
-    )
-
     private class StdioMcpClient(
         private val mapper: ObjectMapper,
         private val workingDir: File,
         private val entrypoint: File,
+        private val onNotification: (method: String, params: JsonNode) -> Unit = { _, _ -> },
     ) : AutoCloseable {
 
         private val process: Process = ProcessBuilder("node", entrypoint.absolutePath)
@@ -396,6 +298,10 @@ class MCPBridgeService(private val project: Project) : Disposable {
                                 future.complete(message.get("result") ?: mapper.nullNode())
                             }
                         }
+                    } else {
+                        val method = message.get("method")?.asText() ?: continue
+                        val params = message.get("params") ?: mapper.createObjectNode()
+                        onNotification(method, params)
                     }
                 }
             } catch (e: Exception) {

@@ -7,44 +7,9 @@ import {
   FlowStateResponse,
   FlowStepSummary,
   OrchestrationResult,
+  PresentationEmitter,
   RunningAgentMetadata,
 } from "../types.js";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-
-const STATE_FILE = path.join(os.tmpdir(), "adhd-bridge-state.json");
-
-function writePresentationToState(agentId: string, text: string, agentMeta?: { name: string; description: string; type?: string }): void {
-  try {
-    let state: Record<string, unknown> = { agents: [], tasks: [], presentations: [] };
-    if (fs.existsSync(STATE_FILE)) {
-      state = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
-      if (!Array.isArray(state.presentations)) state.presentations = [];
-    }
-    if (!Array.isArray(state.agents)) state.agents = [];
-
-    const agentsList = state.agents as Array<Record<string, string>>;
-    const alreadyRegistered = agentsList.some((a) => a.id === agentId);
-    if (!alreadyRegistered && agentMeta) {
-      agentsList.push({
-        id: agentId,
-        name: agentMeta.name,
-        type: agentMeta.type ?? "agent",
-        description: agentMeta.description,
-      });
-    }
-
-    (state.presentations as unknown[]).push({
-      presentationId: `pres-${Date.now()}`,
-      agentId,
-      text,
-      status: "PENDING",
-      createdAt: Date.now(),
-    });
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
-  } catch (_) {}
-}
 
 const CONFIDENCE_THRESHOLD = 0.5;
 const FLOW_TTL_MS = 30 * 60 * 1000;
@@ -68,7 +33,7 @@ export class Orchestrator {
   private closedPresentations: ClosedPresentationEvent[] = [];
   private implicitFlowCounter = 0;
 
-  constructor(private registry: AgentRegistry) {}
+  constructor(private registry: AgentRegistry, private emit: PresentationEmitter) {}
 
   evaluate(query: string): OrchestrationResult {
     const agents = this.registry.getAllAgents();
@@ -126,7 +91,7 @@ export class Orchestrator {
     });
 
     try {
-      const result = await this.runAgent(agentName, context);
+      const result = await this.runAgent(agentName, { ...context, emit: this.emit });
       this.appendFlowStep(flow, {
         agentName,
         success: result.success,
@@ -148,17 +113,17 @@ export class Orchestrator {
         },
       });
 
-      const presenterAgentId = participants[participants.length - 1] ?? agentName;
+      const presenterId = participants[participants.length - 1] ?? agentName;
       const presentationText = explainerResult.message.trim();
-      const presenterAgent = this.registry.getAgent(presenterAgentId);
-      writePresentationToState(
-        presenterAgentId,
-        presentationText,
-        presenterAgent
-          ? { name: presenterAgent.name, description: presenterAgent.description, type: presenterAgent.type }
-          : undefined
-      );
-      this.addClosedPresentationEvent(flowId, presenterAgentId, presentationText);
+      const presenterAgent = this.registry.getAgent(presenterId);
+      this.emit({
+        presentationId: `pres-${Date.now()}`,
+        agentId: presenterId,
+        agentName: presenterAgent?.name ?? presenterId,
+        agentType: presenterAgent?.type ?? "agent",
+        text: presentationText,
+      });
+      this.addClosedPresentationEvent(flowId, presenterId, presentationText);
 
       const inlineMessage = [
         result.message.trim(),

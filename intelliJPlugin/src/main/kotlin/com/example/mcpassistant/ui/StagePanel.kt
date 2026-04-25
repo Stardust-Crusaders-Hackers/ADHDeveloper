@@ -2,6 +2,9 @@ package com.example.mcpassistant.ui
 
 import com.example.mcpassistant.model.Agent
 import com.example.mcpassistant.model.AgentTask
+import com.example.mcpassistant.services.ElevenLabsService
+import com.example.mcpassistant.settings.StageSettingsState
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBPanel
 import java.awt.*
@@ -102,6 +105,11 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
 
             val stageTarget = stageCenter()
             taskBubble.setText(text)
+
+            val settings = StageSettingsState.getInstance()
+            if (settings.ttsEnabled) {
+                project.service<ElevenLabsService>().speak(text, avatar.agent.type)
+            }
 
             animEngine.walkToStage(avatar, audienceInPanel, stageTarget) {
                 SwingUtilities.invokeLater {
