@@ -25,7 +25,7 @@ const globalEntry = {
     "-e",
     `const { spawn } = require('node:child_process');
 const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const child = spawn(cmd, ['-y', '${PKG_NAME}'], { stdio: 'inherit', shell: false });
+const child = spawn(cmd, ['-y', '${PKG_NAME}'], { stdio: ['ignore', 'inherit', 'inherit'], shell: process.platform === 'win32' });
 child.on('error', (err) => { console.error('[adhd-developer] failed to launch via npx:', err); process.exit(1); });
 child.on('exit', (code) => process.exit(code ?? 0));
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => child.kill(sig));`,
@@ -40,7 +40,7 @@ function writeLauncher(projectPath: string): { filePath: string; outcome: "creat
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(cmd, ["-y", "${PKG_NAME}"], { stdio: "inherit", shell: false });
+const child = spawn(cmd, ["-y", "${PKG_NAME}"], { stdio: ["ignore", "inherit", "inherit"], shell: process.platform === "win32" });
 
 child.on("error", (err) => {
   console.error("[adhd-developer] MCP launcher failed:", err);
