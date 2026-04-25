@@ -6,14 +6,41 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
-import { setupProject } from "./tools/setupProject.js";
+import { enableMcp, disableMcp, setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
+import { explainSubdirectories } from "./tools/explainSubdirectories.js";
+import { ensureTestPlaybook } from "./tools/testPlaybook.js";
 import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
-import { readFile, getCacheInfo, invalidate, clearCache } from "./tools/contextCache.js";
+import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } from "./tools/contextCache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+async function runCliCommand(argv: string[]): Promise<boolean> {
+  const [command, ...rest] = argv;
+  if (!command) {
+    return false;
+  }
+
+  const projectPath = path.resolve(rest[0] ?? process.cwd());
+  let result: unknown;
+
+  if (command === "enable" || command === "setup_project") {
+    result = await enableMcp(projectPath);
+  } else if (command === "disable") {
+    result = await disableMcp(projectPath);
+  } else {
+    return false;
+  }
+
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  return true;
+}
+
 async function main() {
+  if (await runCliCommand(process.argv.slice(2))) {
+    return;
+  }
+
   const registry = new AgentRegistry();
   const agentsDir = path.join(__dirname, "agents");
   await registry.discoverAgents(agentsDir);
@@ -47,7 +74,14 @@ async function main() {
     {
       agentName: z.string().describe("The name of the agent to execute"),
       query: z.string().describe("The task or query for the agent"),
-      metadata: z.record(z.unknown()).optional().describe("Optional additional context"),
+      metadata: z
+        .object({
+          flowId: z.string().optional().describe("Optional flow identifier to group multi-agent executions"),
+          flowCompleted: z.boolean().optional().describe("Marks the current flow as completed and triggers the final explainer"),
+        })
+        .catchall(z.unknown())
+        .optional()
+        .describe("Optional additional context"),
     },
     async ({ agentName, query, metadata }) => {
       const result = await orchestrator.executeAgent(agentName, { query, metadata });
@@ -70,8 +104,36 @@ async function main() {
   );
 
   server.tool(
+    "mcp_enable",
+    "Enable adhd-developer MCP integration for this project and supported clients.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
+    },
+    async ({ projectPath }) => {
+      const result = await enableMcp(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "mcp_disable",
+    "Disable adhd-developer MCP integration for this project and supported clients.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root where configs will be removed"),
+    },
+    async ({ projectPath }) => {
+      const result = await disableMcp(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
     "setup_project",
-    "Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
+    "Alias of mcp_enable. Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, Cursor, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
     {
       projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
     },
@@ -153,6 +215,40 @@ async function main() {
   );
 
   server.tool(
+    "explain_subdirectories",
+    "Create/merge per-subdirectory conceptual and architectural docs, list contents, and add recommended workflow notes with stack-aware file format handling.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root"),
+      language: z.string().optional().describe("Output language (e.g. 'es', 'en'). If omitted, inferred from runtime locale."),
+      stack: z.string().optional().describe("Optional stack override (python, java, node, etc.)"),
+      includeHidden: z.boolean().optional().describe("Whether to include hidden directories/files. Default: false"),
+      maxDepth: z.number().int().min(1).max(32).optional().describe("Maximum recursion depth for subdirectories. Default: 8"),
+      overwritePolicy: z.enum(["merge", "overwrite", "no-overwrite"]).optional().describe("Conflict policy when target file exists. Default: merge"),
+      fallbackFilename: z.string().optional().describe("Fallback filename when format cannot be inferred. Default: index.md"),
+    },
+    async (params) => {
+      const result = await explainSubdirectories(params);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "test_playbook",
+    "Analyze the workspace test structure and generate or refresh TESTS.md. Also keeps AGENTS.md, CLAUDE.md, and GEMINI.md pointed at the playbook when it changes.",
+    {
+      projectPath: z.string().optional().describe("Project root or workspace root. Defaults to the current working directory."),
+    },
+    async ({ projectPath }) => {
+      const result = ensureTestPlaybook(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
     "read_file_cached",
     "Read a file from disk and cache its content in memory. Subsequent reads of the same path return from cache — no disk I/O, no redundant context. Use this instead of raw file reads whenever you may need a file more than once in a session.",
     {
@@ -164,7 +260,7 @@ async function main() {
         ? `[CACHE HIT — hit #${result.hits}, ${result.sizeBytes} bytes, no disk read]`
         : `[DISK READ — cached for future calls, ${result.sizeBytes} bytes]`;
       return {
-        content: [{ type: "text" as const, text: `${meta}\n\n${result.content}` }],
+        content: [toTextContentBlock(result, meta)],
       };
     }
   );

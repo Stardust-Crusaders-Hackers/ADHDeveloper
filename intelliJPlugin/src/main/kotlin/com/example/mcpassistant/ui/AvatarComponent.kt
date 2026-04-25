@@ -72,8 +72,8 @@ class AvatarComponent(val agent: Agent) : JComponent() {
 
     private fun drawHeadAndBody(g2d: Graphics2D, bounds: Rectangle, cx: Int) {
         drawHead(g2d, bounds)
-        renderer.drawBody(g2d, bounds, animFrame, state)
-        renderer.drawRoleIcon(g2d, cx, bounds.y + bounds.height / 2, 12)
+        renderer?.drawBody(g2d, bounds, animFrame, state)
+        renderer?.drawRoleIcon(g2d, cx, bounds.y + bounds.height / 2, 12)
         drawEyes(g2d, bounds)
     }
 
@@ -81,9 +81,9 @@ class AvatarComponent(val agent: Agent) : JComponent() {
         val headSize = bounds.width / 2
         val headX = bounds.x + bounds.width / 4
         val headY = bounds.y
-        g2d.color = renderer.headColor
+        g2d.color = renderer?.headColor ?: Color.GRAY
         g2d.fillOval(headX, headY, headSize, headSize)
-        g2d.color = renderer.headColor.darker()
+        g2d.color = renderer?.headColor?.darker() ?: Color.DARK_GRAY
         g2d.drawOval(headX, headY, headSize, headSize)
     }
 
@@ -113,7 +113,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
             val armAngle = (Math.PI * 0.5 * Math.sin(progress * Math.PI)).toFloat()
             val cx = (bounds.x + bounds.width / 2).toFloat()
             val shoulderY = (bounds.y + bounds.height * 2 / 3).toFloat()
-            g2d.color = renderer.bodyColor
+            g2d.color = renderer?.bodyColor ?: Color.GRAY
             g2d.stroke = BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
             val armLen = bounds.width / 3f
             val armEndX = (cx + armLen * Math.cos(armAngle - Math.PI / 4)).toInt()

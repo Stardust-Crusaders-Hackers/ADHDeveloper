@@ -1,3 +1,9 @@
 [mcp_servers."hackathon-mode"]
 command = "npx"
 args = ["-y", "hackathon-mode@latest"]
+
+[mcp_servers."hackathon-mode".tools.enable_hackathon_mode]
+approval_mode = "approve"
+
+[mcp_servers."hackathon-mode".tools._hackathon_rules]
+approval_mode = "approve"

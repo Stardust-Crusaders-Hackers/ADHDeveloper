@@ -145,3 +145,9 @@ vite.config.ts.timestamp-*
 # IntelliJ Plugin — Gradle cache and build output
 intelliJPlugin/.gradle/
 intelliJPlugin/build/
+
+# IDE project files
+.idea/
+
+# junie
+.junie/

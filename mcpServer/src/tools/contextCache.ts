@@ -3,6 +3,8 @@ import * as path from "path";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type CacheControl = { type: "ephemeral" };
+
 export interface CacheEntry {
   content: string;
   sizeBytes: number;
@@ -16,6 +18,13 @@ export interface ReadResult {
   source: "cache" | "disk";
   sizeBytes: number;
   hits: number;
+  cacheControl?: CacheControl;
+}
+
+export interface TextContentBlock {
+  type: "text";
+  text: string;
+  cache_control?: CacheControl;
 }
 
 export interface CacheInfo {
@@ -35,6 +44,7 @@ export interface CacheInfo {
 
 const cache = new Map<string, CacheEntry>();
 let totalMisses = 0;
+const EPHEMERAL_CACHE_CONTROL: CacheControl = { type: "ephemeral" };
 
 // ─── Core operations ──────────────────────────────────────────────────────────
 
@@ -54,6 +64,7 @@ export function readFile(filePath: string): ReadResult {
       source: "cache",
       sizeBytes: existing.sizeBytes,
       hits: existing.hits,
+      cacheControl: existing.sizeBytes > 1024 ? EPHEMERAL_CACHE_CONTROL : undefined,
     };
   }
 
@@ -73,6 +84,15 @@ export function readFile(filePath: string): ReadResult {
     source: "disk",
     sizeBytes: entry.sizeBytes,
     hits: 0,
+    cacheControl: entry.sizeBytes > 1024 ? EPHEMERAL_CACHE_CONTROL : undefined,
+  };
+}
+
+export function toTextContentBlock(result: ReadResult, prefix: string): TextContentBlock {
+  return {
+    type: "text",
+    text: `${prefix}\n\n${result.content}`,
+    ...(result.cacheControl ? { cache_control: result.cacheControl } : {}),
   };
 }
 
