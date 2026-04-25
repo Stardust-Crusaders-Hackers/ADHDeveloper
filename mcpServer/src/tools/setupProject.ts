@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { buildPatch } from "./patchUtils.js";
+import { FilePatch } from "../types.js";
 
 export interface SetupResult {
   created: string[];
@@ -9,6 +11,7 @@ export interface SetupResult {
   skipped: string[];
   errors: string[];
   notes: string[];
+  patches?: FilePatch[];
 }
 
 const SERVER_KEY = "adhd-developer";
@@ -29,13 +32,11 @@ for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => child.k
   ],
 };
 
-function writeLauncher(projectPath: string): { filePath: string; outcome: "created" | "merged" } {
+function writeLauncher(projectPath: string): { filePath: string; outcome: "created" | "merged"; patch?: FilePatch } {
   const launcherPath = path.join(projectPath, LAUNCHER_RELATIVE_PATH);
   const existed = fs.existsSync(launcherPath);
   fs.mkdirSync(path.dirname(launcherPath), { recursive: true });
-  fs.writeFileSync(
-    launcherPath,
-    `#!/usr/bin/env node
+  const content = `#!/usr/bin/env node
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
@@ -48,10 +49,11 @@ child.on("error", (err) => {
 
 child.on("exit", (code) => process.exit(code ?? 0));
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => child.kill(sig));
-`,
-    "utf-8"
-  );
-  return { filePath: launcherPath, outcome: existed ? "merged" : "created" };
+`;
+  const existingRaw = existed ? fs.readFileSync(launcherPath, "utf-8") : "";
+  fs.writeFileSync(launcherPath, content, "utf-8");
+  const patch = buildPatch(launcherPath, existingRaw, content);
+  return { filePath: launcherPath, outcome: existed ? "merged" : "created", patch };
 }
 
 function mergeJson(
@@ -59,19 +61,24 @@ function mergeJson(
   serverKey: string,
   entry: unknown,
   rootKey: string
-): "created" | "merged" {
+): { outcome: "created" | "merged"; patch?: FilePatch } {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify({ [rootKey]: { [serverKey]: entry } }, null, 2) + "\n");
-    return "created";
+    const content = JSON.stringify({ [rootKey]: { [serverKey]: entry } }, null, 2) + "\n";
+    fs.writeFileSync(filePath, content);
+    const patch = buildPatch(filePath, "", content);
+    return { outcome: "created", patch };
   }
 
-  const existing = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  const existingRaw = fs.readFileSync(filePath, "utf-8");
+  const existing = JSON.parse(existingRaw);
   existing[rootKey] ??= {};
   existing[rootKey][serverKey] = entry;
-  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2) + "\n");
-  return "merged";
+  const newContent = JSON.stringify(existing, null, 2) + "\n";
+  fs.writeFileSync(filePath, newContent);
+  const patch = buildPatch(filePath, existingRaw, newContent);
+  return { outcome: "merged", patch };
 }
 
 function removeJsonServer(filePath: string, serverKey: string, rootKey: string): "removed" | "skipped" {
@@ -154,18 +161,23 @@ export async function enableMcp(projectPath: string): Promise<SetupResult> {
 
   const launcher = writeLauncher(projectPath);
   track(launcher.outcome, launcher.filePath);
+  if (launcher.patch) { result.patches = result.patches ?? []; result.patches.push(launcher.patch); }
 
   const configs: Array<() => void> = [
     // Claude Code
     () => {
       const file = path.join(projectPath, ".mcp.json");
-      track(mergeJson(file, SERVER_KEY, launchEntry, "mcpServers"), file);
+      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      track(res.outcome, file);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
     // VS Code Copilot
     () => {
       const file = path.join(projectPath, ".vscode", "mcp.json");
-      track(mergeJson(file, SERVER_KEY, vscodeEntry, "servers"), file);
+      const res = mergeJson(file, SERVER_KEY, vscodeEntry, "servers");
+      track(res.outcome, file);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
     // OpenAI Codex
@@ -177,25 +189,33 @@ export async function enableMcp(projectPath: string): Promise<SetupResult> {
     // Gemini CLI
     () => {
       const file = path.join(projectPath, ".gemini", "settings.json");
-      track(mergeJson(file, SERVER_KEY, launchEntry, "mcpServers"), file);
+      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      track(res.outcome, file);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
     // Junie (JetBrains)
     () => {
       const file = path.join(projectPath, ".junie", "mcp", "mcp.json");
-      track(mergeJson(file, SERVER_KEY, launchEntry, "mcpServers"), file);
+      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      track(res.outcome, file);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
     // Cursor
     () => {
       const file = path.join(projectPath, ".cursor", "mcp.json");
-      track(mergeJson(file, SERVER_KEY, launchEntry, "mcpServers"), file);
+      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      track(res.outcome, file);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
     // GitHub Copilot CLI — no project-level support, only global (~/.copilot/mcp-config.json)
     () => {
       const globalConfig = path.join(os.homedir(), ".copilot", "mcp-config.json");
-      track(mergeJson(globalConfig, SERVER_KEY, globalEntry, "mcpServers"), globalConfig);
+      const res = mergeJson(globalConfig, SERVER_KEY, globalEntry, "mcpServers");
+      track(res.outcome, globalConfig);
+      if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
       result.notes.push(
         "GitHub Copilot CLI uses global MCP config (~/.copilot/mcp-config.json). Added cross-platform Node launcher entry there."
       );
