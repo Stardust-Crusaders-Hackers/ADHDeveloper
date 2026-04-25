@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 @Service(Service.Level.PROJECT)
 class AgentRegistryService(private val project: Project) : Disposable {
@@ -19,9 +20,20 @@ class AgentRegistryService(private val project: Project) : Disposable {
     )
 
     private val agents = ConcurrentHashMap<String, AgentState>()
-    private val listeners = mutableListOf<StageUIListener>()
+    private val listeners = CopyOnWriteArrayList<StageUIListener>()
 
-    fun addListener(l: StageUIListener) { listeners.add(l) }
+    fun addListener(l: StageUIListener, replayCurrentState: Boolean = true) {
+        if (listeners.contains(l)) return
+        listeners.add(l)
+        if (!replayCurrentState) return
+
+        val snapshot = agents.values.map { it.copy(currentTask = it.currentTask) }
+        fireOnEDT {
+            snapshot.forEach { state -> l.onAgentRegistered(state.agent) }
+            snapshot.mapNotNull { it.currentTask }.forEach { task -> l.onTaskStarted(task) }
+        }
+    }
+
     fun removeListener(l: StageUIListener) { listeners.remove(l) }
 
     fun registerAgent(agent: Agent) {
@@ -44,6 +56,10 @@ class AgentRegistryService(private val project: Project) : Disposable {
             it.currentTask = null
         }
         fireOnEDT { listeners.forEach { it.onTaskCompleted(taskId, agentId, result) } }
+    }
+
+    fun stagePresentation(presentationId: String, agentId: String, text: String) {
+        fireOnEDT { listeners.forEach { it.onStagePresentation(presentationId, agentId, text) } }
     }
 
     fun getAgents(): List<AgentState> = agents.values.toList()

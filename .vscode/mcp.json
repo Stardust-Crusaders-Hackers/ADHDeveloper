@@ -7,6 +7,13 @@
         "-y",
         "hackathon-mode@latest"
       ]
+    },
+    "adhd-developer": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".mcp/adhd-developer-launcher.cjs"
+      ]
     }
   }
 }
