@@ -148,3 +148,6 @@ intelliJPlugin/build/
 
 # IDE project files
 .idea/
+
+# junie
+.junie/
