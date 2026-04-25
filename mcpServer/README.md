@@ -133,6 +133,54 @@ Notes:
 - Direct calls to `agentName: "explainer"` keep normal behavior and do not chain another explainer.
 - Flow state is in-memory only and has TTL cleanup for orphaned flows.
 
+### Flow Monitoring (IDE Plugin Integration)
+- `flow_state`: Get snapshot of all active flows, agents running, step history, and timestamps.
+- `flow_get`: Inspect a specific flow by ID (useful for real-time status updates in IDEs).
+
+#### Monitoring Response Format
+
+`flow_state` returns:
+```json
+{
+  "activeFlows": 2,
+  "flows": [
+    {
+      "id": "flow-123",
+      "createdAt": 1713097200000,
+      "updatedAt": 1713097250000,
+      "ageMs": 50000,
+      "participants": ["planner", "documenter"],
+      "stepsCount": 2,
+      "steps": [
+        { "agentName": "planner", "success": true, "messageExcerpt": "Created plan..." },
+        { "agentName": "documenter", "success": true, "messageExcerpt": "Updated README..." }
+      ]
+    }
+  ],
+  "timestamp": 1713097250000
+}
+```
+
+`flow_get` with valid flowId returns same structure as single flow object.  
+`flow_get` with expired/invalid flowId returns `{ "error": "Flow not found or expired" }`.
+
+**IntelliJ Plugin Usage:**
+```kotlin
+// MCPBridgeService.kt
+fun getActiveFlows(): FlowStateResponse {
+    return mcp.call("flow_state")
+}
+
+fun getFlowDetails(flowId: String): FlowMetadata? {
+    return mcp.call("flow_get", mapOf("flowId" to flowId))
+}
+
+// Render in AgentStage ToolWindow:
+// - Show active agents per flow
+// - Track execution timeline (createdAt → updatedAt)
+// - Display step history with success/failure status
+```
+
 ### Codebase Mastery
 - `repo_bootstrap`: Scaffolds new projects with best practices.
 - `explain_subdirectories`: Generates architectural summaries of your folders.
