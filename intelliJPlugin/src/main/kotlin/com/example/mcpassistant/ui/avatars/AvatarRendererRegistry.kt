@@ -7,6 +7,7 @@ object AvatarRendererRegistry {
         // Register all built-in renderers at class-load time
         listOf(
             AssistantRenderer(),
+            ClaudeRenderer(),
             CoderRenderer(),
             DefaultRobotRenderer(),
             OrchestratorRenderer(),
