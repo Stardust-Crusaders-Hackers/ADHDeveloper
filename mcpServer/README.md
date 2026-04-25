@@ -26,7 +26,7 @@ Add this to your `claude_desktop_config.json`:
 ## Tools
 
 - `orchestrate`: Route tasks to specific agents.
-- `execute_agent`: Run a specific agent (planner, focus-timer, mood-detector, repo-initializer).
+- `execute_agent`: Run a specific agent (planner, focus-timer, mood-detector, repo-initializer, documenter, smoke-tester, explainer).
 - `list_agents`: See available agents.
 - `setup_project`: Configure local project environments.
 - `repo_bootstrap`: Scaffold a repository from structured requirements (multi-stack, architecture, Docker/Nginx optional, safe conflict policy).
