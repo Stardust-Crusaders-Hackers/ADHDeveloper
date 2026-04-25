@@ -41,6 +41,12 @@ class McpInstallStartupActivity : StartupActivity.DumbAware {
     }
 
     private fun findMcpServerDir(project: Project): File? {
+        val settings = StageSettingsState.getInstance()
+        if (settings.mcpServerPath.isNotEmpty()) {
+            val dir = File(settings.mcpServerPath)
+            if (dir.exists() && dir.isDirectory) return dir
+        }
+
         val base = File(project.basePath ?: return null)
         return File(base, "mcpServer").takeIf { it.exists() && it.isDirectory }
     }

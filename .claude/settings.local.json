@@ -2,9 +2,7 @@
   "enabledMcpjsonServers": [
     "hackathon-mode"
   ],
-  "enableAllProjectMcpServers": true
-}
-{
+  "enableAllProjectMcpServers": true,
   "permissions": {
     "allow": [
       "Skill(update-config)",
@@ -17,9 +15,7 @@
       "Glob(*)",
       "Grep(*)",
       "WebFetch(*)",
-      "WebSearch(*)"
-    ],
-    "defaultMode": "acceptEdits"
+      "WebSearch(*)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(npm view *)",
       "Bash(npm run *)",
@@ -34,6 +30,7 @@
       "WebFetch(domain:docs.github.com)",
       "WebFetch(domain:www.jetbrains.com)",
       "WebFetch(domain:junie.jetbrains.com)"
-    ]
+    ],
+    "defaultMode": "acceptEdits"
   }
 }

@@ -237,7 +237,7 @@ export async function runBenchmark(
       avgMemoryDeltaKb: round2(avgMemory),
       avgOutputLength: Math.round(avgOutput),
       estimatedTokensPerRun: Math.round(avgOutput / 4),
-      consistencyScore: round3(computeConsistency(successfulOutputs)),
+      consistencyScore: successfulOutputs.length === 0 ? 0 : round3(computeConsistency(successfulOutputs)),
     };
 
     if (qualityKeywords && qualityKeywords.length > 0) {
