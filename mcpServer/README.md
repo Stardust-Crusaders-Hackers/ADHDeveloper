@@ -181,10 +181,54 @@ fun getFlowDetails(flowId: String): FlowMetadata? {
 // - Display step history with success/failure status
 ```
 
+### Security & Code Quality
+- `securityAuditor`: Comprehensive security scanning across all languages. Detects SAST vulnerabilities, dependency issues, hardcoded secrets, and configuration problems. Reports with severity levels and suggested fixes.
+
 ### Codebase Mastery
 - `repo_bootstrap`: Scaffolds new projects with best practices.
 - `explain_subdirectories`: Generates architectural summaries of your folders.
 - `smoke_tester`: Runs quick checks to ensure nothing is broken.
+
+## Security Auditor Agent
+
+The `securityAuditor` performs comprehensive vulnerability scanning:
+
+### Capabilities
+- **Static Code Analysis (SAST)**: Detects injection attacks, XSS, weak crypto, eval usage, insecure randomness across all languages
+- **Dependency Audits**: Checks npm, Python pip, Maven, Gradle, and Go module vulnerabilities
+- **Secrets Detection**: Finds hardcoded credentials, API keys, AWS keys, JWT tokens, private keys
+- **Configuration Audit**: Scans for exposed sensitive files, bad permissions, CORS misconfigurations, missing security headers
+
+### Usage Example
+
+```json
+{
+  "agentName": "securityAuditor",
+  "query": "Audit security vulnerabilities in this codebase",
+  "metadata": { "projectRoot": "/path/to/project" }
+}
+```
+
+### Response Format
+
+The agent returns a Markdown report with:
+- Summary statistics (total vulnerabilities, by severity and type)
+- Detailed findings grouped by vulnerability type
+- Each finding includes: title, severity, file/line, description, suggested fix, and CVE ID (if applicable)
+- Actionable recommendations prioritized by severity
+
+Example vulnerability entry in report:
+```
+#### ⚠️ SQL Injection Risk `CRITICAL`
+
+**File**: src/database/queries.ts:42
+
+**Description**: Potential SQL injection via string concatenation
+
+**Code**: `const query = "SELECT * FROM users WHERE id = " + userId;`
+
+**Suggested Fix**: Use parameterized queries: `db.query('SELECT * FROM users WHERE id = ?', [userId])`
+```
 
 ### Example Workflow
 1. **User:** "I need to build a login page."
@@ -192,7 +236,8 @@ fun getFlowDetails(flowId: String): FlowMetadata? {
 3. **Agent:** Uses `planner` to write `plan.md`.
 4. **Agent:** Uses `focus-timer` to start a 25-minute sprint.
 5. **Agent:** Implements code.
-6. **Agent:** Uses `smoke_tester` to verify.
+6. **Agent:** Uses `securityAuditor` to scan for vulnerabilities.
+7. **Agent:** Uses `smoke_tester` to verify.
 
 ## Development
 
