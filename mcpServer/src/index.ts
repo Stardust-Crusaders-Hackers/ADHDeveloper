@@ -6,7 +6,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
-import { setupProject } from "./tools/setupProject.js";
+import { enableMcp, disableMcp, setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
 import { explainSubdirectories } from "./tools/explainSubdirectories.js";
 import { ensureTestPlaybook } from "./tools/testPlaybook.js";
@@ -15,7 +15,32 @@ import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } fr
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+async function runCliCommand(argv: string[]): Promise<boolean> {
+  const [command, ...rest] = argv;
+  if (!command) {
+    return false;
+  }
+
+  const projectPath = path.resolve(rest[0] ?? process.cwd());
+  let result: unknown;
+
+  if (command === "enable" || command === "setup_project") {
+    result = await enableMcp(projectPath);
+  } else if (command === "disable") {
+    result = await disableMcp(projectPath);
+  } else {
+    return false;
+  }
+
+  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  return true;
+}
+
 async function main() {
+  if (await runCliCommand(process.argv.slice(2))) {
+    return;
+  }
+
   const registry = new AgentRegistry();
   const agentsDir = path.join(__dirname, "agents");
   await registry.discoverAgents(agentsDir);
@@ -49,7 +74,14 @@ async function main() {
     {
       agentName: z.string().describe("The name of the agent to execute"),
       query: z.string().describe("The task or query for the agent"),
-      metadata: z.record(z.unknown()).optional().describe("Optional additional context"),
+      metadata: z
+        .object({
+          flowId: z.string().optional().describe("Optional flow identifier to group multi-agent executions"),
+          flowCompleted: z.boolean().optional().describe("Marks the current flow as completed and triggers the final explainer"),
+        })
+        .catchall(z.unknown())
+        .optional()
+        .describe("Optional additional context"),
     },
     async ({ agentName, query, metadata }) => {
       const result = await orchestrator.executeAgent(agentName, { query, metadata });
@@ -72,8 +104,36 @@ async function main() {
   );
 
   server.tool(
+    "mcp_enable",
+    "Enable adhd-developer MCP integration for this project and supported clients.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
+    },
+    async ({ projectPath }) => {
+      const result = await enableMcp(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "mcp_disable",
+    "Disable adhd-developer MCP integration for this project and supported clients.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root where configs will be removed"),
+    },
+    async ({ projectPath }) => {
+      const result = await disableMcp(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
     "setup_project",
-    "Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, Cursor, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
+    "Alias of mcp_enable. Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, Cursor, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
     {
       projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
     },

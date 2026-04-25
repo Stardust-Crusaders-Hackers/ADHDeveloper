@@ -2,9 +2,10 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-interface SetupResult {
+export interface SetupResult {
   created: string[];
   merged: string[];
+  removed: string[];
   skipped: string[];
   errors: string[];
   notes: string[];
@@ -73,6 +74,21 @@ function mergeJson(
   return "merged";
 }
 
+function removeJsonServer(filePath: string, serverKey: string, rootKey: string): "removed" | "skipped" {
+  if (!fs.existsSync(filePath)) {
+    return "skipped";
+  }
+
+  const existing = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  if (!existing[rootKey] || typeof existing[rootKey] !== "object" || !(serverKey in existing[rootKey])) {
+    return "skipped";
+  }
+
+  delete existing[rootKey][serverKey];
+  fs.writeFileSync(filePath, JSON.stringify(existing, null, 2) + "\n");
+  return "removed";
+}
+
 function mergeToml(filePath: string, serverKey: string, entry: { command: string; args: string[] }): "created" | "merged" {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 
@@ -105,8 +121,34 @@ function mergeToml(filePath: string, serverKey: string, entry: { command: string
   return "merged";
 }
 
-export async function setupProject(projectPath: string): Promise<SetupResult> {
-  const result: SetupResult = { created: [], merged: [], skipped: [], errors: [], notes: [] };
+function removeTomlServer(filePath: string, serverKey: string): "removed" | "skipped" {
+  if (!fs.existsSync(filePath)) {
+    return "skipped";
+  }
+
+  const header = `[mcp_servers."${serverKey}"]`;
+  const existing = fs.readFileSync(filePath, "utf-8").replace(/\r\n/g, "\n");
+  const lines = existing.split("\n");
+  const start = lines.findIndex((line) => line.trim() === header);
+  if (start < 0) {
+    return "skipped";
+  }
+
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (lines[i].trim().startsWith("[") && lines[i].trim() !== "") {
+      end = i;
+      break;
+    }
+  }
+
+  const updated = [...lines.slice(0, start), ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  fs.writeFileSync(filePath, updated);
+  return "removed";
+}
+
+export async function enableMcp(projectPath: string): Promise<SetupResult> {
+  const result: SetupResult = { created: [], merged: [], removed: [], skipped: [], errors: [], notes: [] };
 
   const track = (outcome: "created" | "merged", file: string) => result[outcome].push(file);
 
@@ -173,4 +215,57 @@ export async function setupProject(projectPath: string): Promise<SetupResult> {
   );
 
   return result;
+}
+
+export async function disableMcp(projectPath: string): Promise<SetupResult> {
+  const result: SetupResult = { created: [], merged: [], removed: [], skipped: [], errors: [], notes: [] };
+  const globalConfig = path.join(os.homedir(), ".copilot", "mcp-config.json");
+
+  const removals: Array<() => void> = [
+    () => {
+      const file = path.join(projectPath, ".mcp.json");
+      result[removeJsonServer(file, SERVER_KEY, "mcpServers")].push(file);
+    },
+    () => {
+      const file = path.join(projectPath, ".vscode", "mcp.json");
+      result[removeJsonServer(file, SERVER_KEY, "servers")].push(file);
+    },
+    () => {
+      const file = path.join(projectPath, ".codex", "config.toml");
+      result[removeTomlServer(file, SERVER_KEY)].push(file);
+    },
+    () => {
+      const file = path.join(projectPath, ".gemini", "settings.json");
+      result[removeJsonServer(file, SERVER_KEY, "mcpServers")].push(file);
+    },
+    () => {
+      const file = path.join(projectPath, ".junie", "mcp", "mcp.json");
+      result[removeJsonServer(file, SERVER_KEY, "mcpServers")].push(file);
+    },
+    () => {
+      const file = path.join(projectPath, ".cursor", "mcp.json");
+      result[removeJsonServer(file, SERVER_KEY, "mcpServers")].push(file);
+    },
+    () => {
+      result[removeJsonServer(globalConfig, SERVER_KEY, "mcpServers")].push(globalConfig);
+      result.notes.push(
+        "GitHub Copilot CLI uses global MCP config (~/.copilot/mcp-config.json). Removed adhd-developer entry there when present."
+      );
+    },
+  ];
+
+  for (const remove of removals) {
+    try {
+      remove();
+    } catch (err) {
+      result.errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  result.notes.push("Launcher file is intentionally kept: .mcp/adhd-developer-launcher.cjs");
+  return result;
+}
+
+export async function setupProject(projectPath: string): Promise<SetupResult> {
+  return enableMcp(projectPath);
 }

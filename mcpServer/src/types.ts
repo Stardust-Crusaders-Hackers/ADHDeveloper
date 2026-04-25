@@ -3,10 +3,27 @@ export interface AgentContext {
   metadata?: Record<string, unknown>;
 }
 
+export interface FlowStepSummary {
+  agentName: string;
+  success: boolean;
+  messageExcerpt: string;
+}
+
+export interface ExecuteAgentFlowData {
+  flowId: string;
+  completed: boolean;
+  implicit: boolean;
+  participants: string[];
+  steps: FlowStepSummary[];
+  explainer?: AgentResult;
+}
+
 export interface AgentResult {
   success: boolean;
   message: string;
-  data?: Record<string, unknown>;
+  data?: Record<string, unknown> & {
+    flow?: ExecuteAgentFlowData;
+  };
 }
 
 export interface AgentDefinition {
