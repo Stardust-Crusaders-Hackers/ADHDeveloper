@@ -29,4 +29,18 @@ export class KeyedCache<T> {
   clear(): void {
     this.store.clear();
   }
+
+  // Return snapshot of entries and their expiry times. Removes expired entries while enumerating.
+  entries(): Array<{ key: string; value: T; expiresAt: number }> {
+    const now = Date.now();
+    const out: Array<{ key: string; value: T; expiresAt: number }> = [];
+    for (const [key, entry] of this.store.entries()) {
+      if (now > entry.expiresAt) {
+        this.store.delete(key);
+        continue;
+      }
+      out.push({ key, value: entry.value, expiresAt: entry.expiresAt });
+    }
+    return out;
+  }
 }

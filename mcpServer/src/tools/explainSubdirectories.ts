@@ -1,5 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
+import { buildPatch } from "./patchUtils.js";
+import { FilePatch } from "../types.js";
 
 type OverwritePolicy = "merge" | "overwrite" | "no-overwrite";
 type Language = "es" | "en";
@@ -10,6 +12,7 @@ interface ExplainResult {
   skipped: string[];
   errors: string[];
   notes: string[];
+  patches?: FilePatch[];
 }
 
 interface ExplainOptions {
@@ -481,6 +484,9 @@ export async function explainSubdirectories(options: ExplainOptions): Promise<Ex
                 : `${javaBlock}\n\npackage ${target.javaPackageName};\n`;
           fs.writeFileSync(targetPath, content, "utf-8");
           result.created.push(targetPath);
+          const patch = buildPatch(targetPath, "", content);
+          result.patches = result.patches ?? [];
+          result.patches.push(patch);
           continue;
         }
 
@@ -496,8 +502,12 @@ export async function explainSubdirectories(options: ExplainOptions): Promise<Ex
               : target.type === "python-init"
                 ? `${pythonBlock}\n`
                 : `${javaBlock}\n\npackage ${target.javaPackageName};\n`;
+          const existingRaw = fs.readFileSync(targetPath, "utf-8");
           fs.writeFileSync(targetPath, content, "utf-8");
           result.merged.push(targetPath);
+          const patch = buildPatch(targetPath, existingRaw, content);
+          result.patches = result.patches ?? [];
+          result.patches.push(patch);
           continue;
         }
 
@@ -510,6 +520,9 @@ export async function explainSubdirectories(options: ExplainOptions): Promise<Ex
         }
         fs.writeFileSync(targetPath, merged, "utf-8");
         result.merged.push(targetPath);
+        const patch = buildPatch(targetPath, existing, merged);
+        result.patches = result.patches ?? [];
+        result.patches.push(patch);
       } catch (err) {
         result.errors.push(err instanceof Error ? `${targetPath}: ${err.message}` : `${targetPath}: ${String(err)}`);
       }

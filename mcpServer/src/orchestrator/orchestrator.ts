@@ -15,6 +15,11 @@ const CONFIDENCE_THRESHOLD = 0.5;
 const FLOW_TTL_MS = 30 * 60 * 1000;
 const CLOSED_PRESENTATION_TTL_MS = 2 * 60 * 1000;
 
+// Sliding window and excerpting config (tunable via env)
+const FLOW_SLIDING_WINDOW = Number(process.env.FLOW_SLIDING_WINDOW) || 5;
+const FLOW_SUMMARY_EXCERPT_CHARS = Number(process.env.FLOW_SUMMARY_EXCERPT_CHARS) || 160;
+const FLOW_EXCERPT_MAX_LENGTH = Number(process.env.FLOW_EXCERPT_MAX_LENGTH) || 180;
+
 interface ExecuteAgentMetadata extends Record<string, unknown> {
   flowId?: string;
   flowCompleted?: boolean;
@@ -104,12 +109,22 @@ export class Orchestrator {
       }
 
       const participants = this.collectParticipants(flow.steps);
+      // Build sliding window for explainer to reduce tokens: summarize older steps, keep recent full steps.
+      const windowSize = FLOW_SLIDING_WINDOW;
+      let flowStepsForExplainer: FlowStepSummary[] = flow.steps;
+      if (flow.steps.length > windowSize) {
+        const recent = flow.steps.slice(-windowSize);
+        const older = flow.steps.slice(0, Math.max(0, flow.steps.length - windowSize));
+        const summarizedOlder = this.summarizeOldSteps(older, FLOW_SUMMARY_EXCERPT_CHARS);
+        flowStepsForExplainer = [...summarizedOlder, ...recent];
+      }
       const explainerResult = await this.runAgent("explainer", {
         query: context.query,
         metadata: {
           flowId,
           flowParticipants: participants,
-          flowSteps: flow.steps,
+          flowSteps: flowStepsForExplainer,
+          flowOriginalStepsCount: flow.steps.length,
         },
       });
 
@@ -266,11 +281,42 @@ export class Orchestrator {
     );
   }
 
-  private toExcerpt(message: string, maxLength = 180): string {
+  private summarizeOldSteps(steps: FlowStepSummary[], perAgentMaxLength = FLOW_SUMMARY_EXCERPT_CHARS): FlowStepSummary[] {
+    if (!steps || steps.length === 0) return [];
+    const groups = new Map<string, FlowStepSummary[]>();
+    for (const s of steps) {
+      const arr = groups.get(s.agentName) ?? [];
+      arr.push(s);
+      groups.set(s.agentName, arr);
+    }
+    const result: FlowStepSummary[] = [];
+    for (const [agentName, group] of groups.entries()) {
+      const count = group.length;
+      const success = group.every((g) => g.success);
+      const first = group[0]?.messageExcerpt ?? "";
+      const last = group[group.length - 1]?.messageExcerpt ?? "";
+      const combined = `${first} ${last}`.trim();
+      const excerpt = this.toExcerpt(combined, perAgentMaxLength);
+      result.push({
+        agentName,
+        success,
+        messageExcerpt: `${count} prior step(s) summarized: ${excerpt}`,
+        originalSteps: count,
+      });
+    }
+    return result;
+  }
+
+  private toExcerpt(message: string, maxLength = FLOW_EXCERPT_MAX_LENGTH): string {
     const compact = message.replace(/\s+/g, " ").trim();
     if (!compact) return "";
     if (compact.length <= maxLength) return compact;
-    return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
+    if (maxLength <= 4) return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
+    const headLen = Math.ceil((maxLength - 1) / 2);
+    const tailLen = (maxLength - 1) - headLen;
+    const head = compact.slice(0, headLen).trimEnd();
+    const tail = compact.slice(-tailLen).trimStart();
+    return `${head}…${tail}`;
   }
 
   // Monitoring API — for plugin inspection

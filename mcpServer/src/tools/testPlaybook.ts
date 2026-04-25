@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+import { buildPatch } from "./patchUtils.js";
+import { FilePatch } from "../types.js";
 
 const PLAYBOOK_FILENAME = "TESTS.md";
 const GUIDE_FILENAMES = ["AGENTS.md", "CLAUDE.md", "GEMINI.md"] as const;
@@ -35,6 +37,7 @@ export interface TestPlaybookResult {
   guideFiles: string[];
   analysis: TestPlaybookAnalysis;
   content: string;
+  patches?: FilePatch[];
 }
 
 export function ensureTestPlaybook(projectPath?: string): TestPlaybookResult {
@@ -49,12 +52,18 @@ export function ensureTestPlaybook(projectPath?: string): TestPlaybookResult {
   const created = !fs.existsSync(playbookPath);
   const updated = existing !== content;
 
+  const patches: FilePatch[] = [];
+
   if (updated) {
     fs.mkdirSync(path.dirname(playbookPath), { recursive: true });
+    const patch = buildPatch(playbookPath, existing, content);
     fs.writeFileSync(playbookPath, content, "utf-8");
+    patches.push(patch);
   }
 
-  const guideFiles = syncGuideFiles(repositoryRoot, path.relative(repositoryRoot, playbookPath));
+  const guideResult = syncGuideFiles(repositoryRoot, path.relative(repositoryRoot, playbookPath));
+  const guideFiles = guideResult.updatedFiles;
+  if (guideResult.patches && guideResult.patches.length > 0) patches.push(...guideResult.patches);
 
   return {
     created,
@@ -63,6 +72,7 @@ export function ensureTestPlaybook(projectPath?: string): TestPlaybookResult {
     guideFiles,
     analysis,
     content,
+    patches,
   };
 }
 
@@ -392,20 +402,24 @@ function formatListItem(label: string, values: string[]): string[] {
   return lines;
 }
 
-function syncGuideFiles(workspaceRoot: string, playbookRelativePath: string): string[] {
+function syncGuideFiles(workspaceRoot: string, playbookRelativePath: string): { updatedFiles: string[]; patches: FilePatch[] } {
   const updatedFiles: string[] = [];
+  const patches: FilePatch[] = [];
   const body = renderGuideBody(playbookRelativePath);
 
   for (const filename of GUIDE_FILENAMES) {
     const filePath = path.join(workspaceRoot, filename);
-    const next = upsertMarkerBlock(fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "", body);
-    if (!fs.existsSync(filePath) || fs.readFileSync(filePath, "utf-8") !== next) {
+    const oldRaw = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+    const next = upsertMarkerBlock(oldRaw, body);
+    if (!fs.existsSync(filePath) || oldRaw !== next) {
       fs.writeFileSync(filePath, next, "utf-8");
       updatedFiles.push(filename);
+      const patch = buildPatch(filePath, oldRaw, next);
+      patches.push(patch);
     }
   }
 
-  return updatedFiles;
+  return { updatedFiles, patches };
 }
 
 function renderGuideBody(playbookRelativePath: string): string {

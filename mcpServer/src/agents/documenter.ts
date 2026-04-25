@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { AgentDefinition, AgentContext, AgentResult } from "../types.js";
+import { AgentDefinition, AgentContext, AgentResult, FilePatch } from "../types.js";
+import { buildPatch } from "../tools/patchUtils.js";
 
 // ─── Code analysis ────────────────────────────────────────────────────────────
 
@@ -129,12 +130,14 @@ function generateDocs(source: string, filePath: string): AgentResult {
 
   const output = lines.join("\n");
   fs.writeFileSync(filePath, output, "utf-8");
+  const patch: FilePatch = buildPatch(filePath, source, output);
 
   return {
     success: true,
     message: `Documented ${toDocument.length} export(s) in ${path.basename(filePath)}.`,
     data: {
       documented: toDocument.map((s) => ({ name: s.name, kind: s.kind, line: s.line })),
+      filePatches: [patch],
     },
   };
 }

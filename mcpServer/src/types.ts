@@ -18,6 +18,7 @@ export interface FlowStepSummary {
   agentName: string;
   success: boolean;
   messageExcerpt: string;
+  originalSteps?: number;
 }
 
 export interface ExecuteAgentFlowData {
@@ -29,11 +30,18 @@ export interface ExecuteAgentFlowData {
   explainer?: AgentResult;
 }
 
+export interface FilePatch {
+  filePath: string;
+  patch: string; // unified diff text
+  summary?: string; // short human-readable summary
+}
+
 export interface AgentResult {
   success: boolean;
   message: string;
   data?: Record<string, unknown> & {
     flow?: ExecuteAgentFlowData;
+    filePatches?: FilePatch[];
   };
 }
 

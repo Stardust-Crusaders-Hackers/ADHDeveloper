@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { AgentDefinition, AgentContext, AgentResult } from "../types.js";
+import { AgentDefinition, AgentContext, AgentResult, FilePatch } from "../types.js";
+import { buildPatch } from "../tools/patchUtils.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -541,13 +542,17 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
 
   const outputs: Record<string, string> = {};
 
+  const patches: FilePatch[] = [];
   function write(relativePath: string, content: string): void {
     if (!content) return;
     outputs[relativePath] = content;
     if (writeFiles) {
       const full = path.join(projectRoot, relativePath);
       fs.mkdirSync(path.dirname(full), { recursive: true });
+      const existingRaw = fs.existsSync(full) ? fs.readFileSync(full, "utf-8") : "";
       fs.writeFileSync(full, content, "utf-8");
+      const patch: FilePatch = buildPatch(full, existingRaw, content);
+      patches.push(patch);
     }
   }
 
@@ -591,7 +596,7 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
   return {
     success: true,
     message: `App: ${appName} | env: ${action === "all" ? "dev+staging+prod" : env} | image: ${image}\n${writtenMsg}${filesList}`,
-    data: { files: writtenFiles, written: writeFiles ? writtenFiles : [] },
+    data: { files: writtenFiles, written: writeFiles ? writtenFiles : [], filePatches: patches },
   };
 }
 
