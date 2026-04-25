@@ -1,12 +1,17 @@
 {
-  "name": "mcp-server",
+  "name": "adhdeveloper",
   "version": "0.1.0",
-  "description": "MCP server (TypeScript + Node)",
+  "description": "MCP server for ADHD-friendly development assistance",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "adhdeveloper": "./dist/index.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"

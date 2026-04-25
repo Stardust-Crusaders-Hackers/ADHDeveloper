@@ -1,27 +1,39 @@
-MCP Server (TypeScript)
+# ADHDeveloper MCP Server
 
-Instrucciones rápidas:
+MCP server designed to assist developers with ADHD through concise planning, focus management, and mood-aware workflows.
 
-1) Entrar en el directorio:
-   cd mcpServer
-2) Instalar dependencias:
-   npm install
-3) Desarrollo:
-   npm run dev
-4) Compilar y ejecutar:
-   npm run build
-   npm start
+## Installation
 
-Endpoints:
-- GET /health -> { status: 'ok' }
-- GET / -> Mensaje simple
+```bash
+npm install -g adhdeveloper
+```
 
-Publicación en NPM:
-- El paquete está preparado para publicar (types incluidos).
-- Build previo a publicar: npm run build
-- Publicar: npm publish --access public
+## Usage with Claude Desktop
 
-Docker (opcional):
-- Se incluye Dockerfile multi-stage para despliegue reproducible.
-- Construir imagen localmente: docker build -t mcp-server:latest ./mcpServer
-- Ejecutar: docker run -p 3000:3000 mcp-server:latest
+Add this to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "adhdeveloper": {
+      "command": "npx",
+      "args": ["-y", "adhdeveloper"]
+    }
+  }
+}
+```
+
+## Tools
+
+- `orchestrate`: Route tasks to specific agents.
+- `execute_agent`: Run a specific agent (planner, focus-timer, mood-detector).
+- `list_agents`: See available agents.
+- `setup_project`: Configure local project environments.
+
+## Development
+
+1. `npm install`
+2. `npm run build`
+3. `npm start` (Stdio transport)
+
+License: MIT
