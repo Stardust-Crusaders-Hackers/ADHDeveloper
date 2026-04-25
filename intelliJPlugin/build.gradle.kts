@@ -40,12 +40,13 @@ dependencies {
 }
 
 intellijPlatform {
+    instrumentCode.set(false)
     pluginConfiguration {
         name = "ADHDeveloper Stage Mode"
         version = "0.1.0"
         ideaVersion {
             sinceBuild = "251"
-            untilBuild = "253.*"
+            untilBuild = "261.*"
         }
     }
 }

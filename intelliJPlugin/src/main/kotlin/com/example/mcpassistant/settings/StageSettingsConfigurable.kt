@@ -43,6 +43,11 @@ class StageSettingsConfigurable : Configurable {
             }
         }
         separator()
+        row("MCP Server Path:") {
+            textFieldWithBrowseButton("Select MCP Server Directory")
+                .bindText(settings::mcpServerPath)
+                .comment("Absolute path to the 'mcpServer' directory (contains package.json)")
+        }
         row { checkBox("Enable MCP integration").bindSelected(settings::mcpEnabled) }
         row { checkBox("Enable TTS narration").bindSelected(settings::ttsEnabled) }
         row { checkBox("Enable sound effects").bindSelected(settings::soundEffectsEnabled) }

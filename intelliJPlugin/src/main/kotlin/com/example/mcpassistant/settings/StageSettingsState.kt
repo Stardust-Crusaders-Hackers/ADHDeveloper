@@ -14,6 +14,7 @@ class StageSettingsState : PersistentStateComponent<StageSettingsState> {
 
     var elevenLabsApiKey: String = ""
     var mcpEnabled: Boolean = true
+    var mcpServerPath: String = ""
     var ttsEnabled: Boolean = true
     var soundEffectsEnabled: Boolean = true
     var voiceAssignments: MutableMap<String, String> = mutableMapOf()
