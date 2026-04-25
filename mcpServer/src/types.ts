@@ -55,6 +55,8 @@ export interface OrchestrationResult {
 export interface FlowStateResponse {
   activeFlows: number;
   flows: FlowMetadata[];
+  runningAgents?: RunningAgentMetadata[];
+  recentClosedPresentations?: ClosedPresentationEvent[];
   timestamp: number;
 }
 
@@ -66,6 +68,21 @@ export interface FlowMetadata {
   participants: string[];
   stepsCount: number;
   steps: FlowStepSummary[];
+}
+
+export interface RunningAgentMetadata {
+  taskId: string;
+  flowId: string;
+  agentName: string;
+  startedAt: number;
+}
+
+export interface ClosedPresentationEvent {
+  eventId: string;
+  flowId: string;
+  agentId: string;
+  text: string;
+  createdAt: number;
 }
 
 export type VulnerabilitySeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";

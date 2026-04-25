@@ -3,8 +3,11 @@ import {
   AgentContext,
   AgentResult,
   AgentRecommendation,
+  ClosedPresentationEvent,
+  FlowStateResponse,
   FlowStepSummary,
   OrchestrationResult,
+  RunningAgentMetadata,
 } from "../types.js";
 import * as fs from "fs";
 import * as os from "os";
@@ -46,6 +49,7 @@ function writePresentationToState(agentId: string, text: string, agentMeta?: { n
 
 const CONFIDENCE_THRESHOLD = 0.5;
 const FLOW_TTL_MS = 30 * 60 * 1000;
+const CLOSED_PRESENTATION_TTL_MS = 2 * 60 * 1000;
 
 interface ExecuteAgentMetadata extends Record<string, unknown> {
   flowId?: string;
@@ -61,6 +65,8 @@ interface FlowState {
 
 export class Orchestrator {
   private flowState = new Map<string, FlowState>();
+  private activeExecutions = new Map<string, RunningAgentMetadata>();
+  private closedPresentations: ClosedPresentationEvent[] = [];
   private implicitFlowCounter = 0;
 
   constructor(private registry: AgentRegistry) {}
@@ -112,62 +118,77 @@ export class Orchestrator {
     const implicit = !explicitFlowId;
     const flowId = explicitFlowId ?? this.createImplicitFlowId();
     const flow = this.ensureFlow(flowId);
-
-    const result = await this.runAgent(agentName, context);
-    this.appendFlowStep(flow, {
+    const taskId = this.createTaskId(flowId, agentName);
+    this.activeExecutions.set(taskId, {
+      taskId,
+      flowId,
       agentName,
-      success: result.success,
-      messageExcerpt: this.toExcerpt(result.message),
+      startedAt: Date.now(),
     });
 
-    const shouldClose = implicit || metadata.flowCompleted === true;
-    if (!shouldClose) {
-      return result;
-    }
+    try {
+      const result = await this.runAgent(agentName, context);
+      this.appendFlowStep(flow, {
+        agentName,
+        success: result.success,
+        messageExcerpt: this.toExcerpt(result.message),
+      });
 
-    const participants = this.collectParticipants(flow.steps);
-    const explainerResult = await this.runAgent("explainer", {
-      query: context.query,
-      metadata: {
-        flowId,
-        flowParticipants: participants,
-        flowSteps: flow.steps,
-      },
-    });
+      const shouldClose = implicit || metadata.flowCompleted === true;
+      if (!shouldClose) {
+        return result;
+      }
 
-
-    // Write presentation to shared JSON so IntelliJ plugin shows the agent on stage
-    const presenterAgentId = participants[participants.length - 1] ?? agentName;
-    const presenterAgent = this.registry.getAgent(presenterAgentId);
-    writePresentationToState(presenterAgentId, explainerResult.message.trim(), presenterAgent
-      ? { name: presenterAgent.name, description: presenterAgent.description }
-      : undefined);
-
-    const inlineMessage = [
-      result.message.trim(),
-      "Explainer:",
-      explainerResult.message.trim(),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    this.flowState.delete(flowId);
-
-    return {
-      ...result,
-      message: inlineMessage,
-      data: {
-        ...(result.data ?? {}),
-        flow: {
+      const participants = this.collectParticipants(flow.steps);
+      const explainerResult = await this.runAgent("explainer", {
+        query: context.query,
+        metadata: {
           flowId,
-          completed: true,
-          implicit,
-          participants,
-          steps: [...flow.steps],
-          explainer: explainerResult,
+          flowParticipants: participants,
+          flowSteps: flow.steps,
         },
-      },
-    };
+      });
+
+      const presenterAgentId = participants[participants.length - 1] ?? agentName;
+      const presentationText = explainerResult.message.trim();
+      const presenterAgent = this.registry.getAgent(presenterAgentId);
+      writePresentationToState(
+        presenterAgentId,
+        presentationText,
+        presenterAgent
+          ? { name: presenterAgent.name, description: presenterAgent.description }
+          : undefined
+      );
+      this.addClosedPresentationEvent(flowId, presenterAgentId, presentationText);
+
+      const inlineMessage = [
+        result.message.trim(),
+        "Explainer:",
+        presentationText,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      this.flowState.delete(flowId);
+
+      return {
+        ...result,
+        message: inlineMessage,
+        data: {
+          ...(result.data ?? {}),
+          flow: {
+            flowId,
+            completed: true,
+            implicit,
+            participants,
+            steps: [...flow.steps],
+            explainer: explainerResult,
+          },
+        },
+      };
+    } finally {
+      this.activeExecutions.delete(taskId);
+    }
   }
 
   private computeScore(queryTokens: string[], queryLower: string, keywords: string[]): number {
@@ -256,6 +277,29 @@ export class Orchestrator {
         this.flowState.delete(flowId);
       }
     }
+    this.pruneClosedPresentations(now);
+  }
+
+  private createTaskId(flowId: string, agentName: string): string {
+    return `${flowId}:${agentName}:${Date.now()}`;
+  }
+
+  private addClosedPresentationEvent(flowId: string, agentId: string, text: string): void {
+    const now = Date.now();
+    this.closedPresentations.push({
+      eventId: `${flowId}:${agentId}:${now}`,
+      flowId,
+      agentId,
+      text,
+      createdAt: now,
+    });
+    this.pruneClosedPresentations(now);
+  }
+
+  private pruneClosedPresentations(now = Date.now()): void {
+    this.closedPresentations = this.closedPresentations.filter(
+      (event) => now - event.createdAt <= CLOSED_PRESENTATION_TTL_MS
+    );
   }
 
   private toExcerpt(message: string, maxLength = 180): string {
@@ -266,12 +310,14 @@ export class Orchestrator {
   }
 
   // Monitoring API — for plugin inspection
-  getFlowState() {
+  getFlowState(): FlowStateResponse {
+    this.cleanupExpiredFlows();
+    const now = Date.now();
     const flows = Array.from(this.flowState.entries()).map(([id, flow]) => ({
       id: flow.id,
       createdAt: flow.createdAt,
       updatedAt: flow.updatedAt,
-      ageMs: Date.now() - flow.createdAt,
+      ageMs: now - flow.createdAt,
       stepsCount: flow.steps.length,
       participants: this.collectParticipants(flow.steps),
       steps: flow.steps,
@@ -279,7 +325,9 @@ export class Orchestrator {
     return {
       activeFlows: flows.length,
       flows,
-      timestamp: Date.now(),
+      runningAgents: Array.from(this.activeExecutions.values()).sort((a, b) => a.startedAt - b.startedAt),
+      recentClosedPresentations: [...this.closedPresentations].sort((a, b) => a.createdAt - b.createdAt),
+      timestamp: now,
     };
   }
 
