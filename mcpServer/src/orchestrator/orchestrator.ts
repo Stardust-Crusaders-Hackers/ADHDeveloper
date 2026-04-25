@@ -128,7 +128,7 @@ export class Orchestrator {
         },
       });
 
-      const presenterId = participants[participants.length - 1] ?? agentName;
+      const presenterId = "explainer"; // Fuerza al agente explainer a salir al escenario
       const presentationText = explainerResult.message.trim();
       const presenterAgent = this.registry.getAgent(presenterId);
       this.emit({
