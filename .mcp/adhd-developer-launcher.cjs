@@ -2,7 +2,11 @@
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(cmd, ["-y", "adhdeveloper@latest"], { stdio: "inherit", shell: false });
+const child = spawn(cmd, ["-y", "--quiet", "adhdeveloper@latest"], { 
+  stdio: ["inherit", "inherit", "inherit"], 
+  shell: process.platform === "win32",
+  env: { ...process.env, NPM_CONFIG_YES: "true" }
+});
 
 child.on("error", (err) => {
   console.error("[adhd-developer] MCP launcher failed:", err);
