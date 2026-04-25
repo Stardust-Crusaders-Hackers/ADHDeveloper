@@ -71,7 +71,7 @@ async function main() {
 
   server.tool(
     "setup_project",
-    "Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
+    "Adds adhd-developer MCP server config to a project for Claude Code, VS Code Copilot, Cursor, OpenAI Codex, Gemini CLI, GitHub Copilot CLI, and Junie. Merges into existing configs without overwriting other entries.",
     {
       projectPath: z.string().describe("Absolute path to the project root where configs will be written"),
     },

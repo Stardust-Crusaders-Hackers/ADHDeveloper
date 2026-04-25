@@ -1,4 +1,32 @@
-import Anthropic from '@anthropic-ai/sdk';
+type CacheControl = { type: "ephemeral" };
+
+interface CavemanTextBlockParam {
+  type: "text";
+  text: string;
+  cache_control?: CacheControl;
+}
+
+interface CavemanToolParam {
+  name: string;
+  description: string;
+  input_schema: {
+    type: "object";
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+interface CavemanMessageParam {
+  role: "user" | "assistant";
+  content: string | unknown;
+}
+
+interface CavemanMessageCreateParamsNonStreaming {
+  system?: string | CavemanTextBlockParam[];
+  tools?: CavemanToolParam[];
+  messages: CavemanMessageParam[];
+  [key: string]: unknown;
+}
 
 // ─── Compression ────────────────────────────────────────────────────────────
 
@@ -42,7 +70,7 @@ export interface CavemanToolInput {
  * Drop into any agent's `tools` array to give it caveman compression capability.
  * The model can call this to compress its own output or user-provided text.
  */
-export const cavemanTool: Anthropic.Tool = {
+export const cavemanTool: CavemanToolParam = {
   name: 'caveman',
   description:
     'Compress text to caveman style: drop articles (a/an/the), filler words, and hedging. ' +
@@ -75,8 +103,8 @@ export function handleCavemanTool(input: CavemanToolInput): string {
 
 // ─── Behavior Injection ──────────────────────────────────────────────────────
 
-type SystemBlock = Anthropic.Messages.TextBlockParam;
-type MsgParams = Anthropic.Messages.MessageCreateParamsNonStreaming;
+type SystemBlock = CavemanTextBlockParam;
+type MsgParams = CavemanMessageCreateParamsNonStreaming;
 
 /**
  * Caveman system instruction injected as a cached block.
@@ -146,7 +174,7 @@ function buildSystem(existing: MsgParams['system']): SystemBlock[] {
   return blocks;
 }
 
-function compressLastUserMsg(messages: Anthropic.Messages.MessageParam[]): Anthropic.Messages.MessageParam[] {
+function compressLastUserMsg(messages: CavemanMessageParam[]): CavemanMessageParam[] {
   if (messages.length === 0) return messages;
   const last = messages[messages.length - 1];
   if (last.role !== 'user' || typeof last.content !== 'string') return messages;
