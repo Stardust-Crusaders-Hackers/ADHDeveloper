@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "hackathon-mode"
+  ],
+  "enableAllProjectMcpServers": true
+}
