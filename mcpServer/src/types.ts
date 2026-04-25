@@ -84,7 +84,6 @@ export interface ClosedPresentationEvent {
   text: string;
   createdAt: number;
 }
-
 export type VulnerabilitySeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
 export type VulnerabilityType =
   | "injection"
