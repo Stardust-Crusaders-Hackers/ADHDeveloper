@@ -1,6 +1,6 @@
 {
   "name": "adhdeveloper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server for ADHD-friendly development assistance",
   "type": "module",
   "main": "dist/index.js",
@@ -36,12 +36,12 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "tsx": "^4.19.0",
-    "typescript": "^5.0.0"
+    "@types/node": "22.19.17",
+    "tsx": "4.19.0",
+    "typescript": "5.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.0",
-    "zod": "^3.23.0"
+    "@modelcontextprotocol/sdk": "1.10.0",
+    "zod": "3.23.0"
   }
 }
