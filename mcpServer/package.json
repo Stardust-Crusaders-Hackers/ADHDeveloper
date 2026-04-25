@@ -1,6 +1,6 @@
 {
   "name": "adhdeveloper",
-  "version": "0.11.0",
+  "version": "1.0.1",
   "description": "MCP server for ADHD-friendly development assistance",
   "type": "module",
   "main": "dist/index.js",

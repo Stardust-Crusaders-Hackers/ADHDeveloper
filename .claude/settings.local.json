@@ -1,8 +1,4 @@
 {
-  "enabledMcpjsonServers": [
-    "hackathon-mode"
-  ],
-  "enableAllProjectMcpServers": true,
   "permissions": {
     "allow": [
       "Skill(update-config)",
@@ -29,8 +25,21 @@
       "WebFetch(domain:code.visualstudio.com)",
       "WebFetch(domain:docs.github.com)",
       "WebFetch(domain:www.jetbrains.com)",
-      "WebFetch(domain:junie.jetbrains.com)"
+      "WebFetch(domain:junie.jetbrains.com)",
+      "mcp__adhd-developer__agents_list",
+      "mcp__adhd-developer__list_agents",
+      "mcp__adhd-developer__cache_info",
+      "mcp__adhd-developer__flow_state",
+      "mcp__adhd-developer__task_start",
+      "mcp__adhd-developer__task_complete",
+      "mcp__adhd-developer__tasks_active",
+      "PowerShell(cd C:\\\\Users\\\\kwolf\\\\Desktop\\\\UPC\\\\hack2025\\\\ADHDeveloper; git log --oneline -10 -- intelliJPlugin/src/main/kotlin/com/example/mcpassistant/ui/AudiencePanel.kt)",
+      "PowerShell(git checkout *)"
     ],
     "defaultMode": "acceptEdits"
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "hackathon-mode"
+  ]
 }
