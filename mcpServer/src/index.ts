@@ -10,7 +10,7 @@ import { setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
 import { explainSubdirectories } from "./tools/explainSubdirectories.js";
 import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
-import { readFile, getCacheInfo, invalidate, clearCache } from "./tools/contextCache.js";
+import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } from "./tools/contextCache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -185,7 +185,7 @@ async function main() {
         ? `[CACHE HIT — hit #${result.hits}, ${result.sizeBytes} bytes, no disk read]`
         : `[DISK READ — cached for future calls, ${result.sizeBytes} bytes]`;
       return {
-        content: [{ type: "text" as const, text: `${meta}\n\n${result.content}` }],
+        content: [toTextContentBlock(result, meta)],
       };
     }
   );
