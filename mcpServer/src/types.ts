@@ -51,3 +51,61 @@ export interface OrchestrationResult {
   recommendations: AgentRecommendation[];
   allAgents?: AgentSummary[];
 }
+
+export interface FlowStateResponse {
+  activeFlows: number;
+  flows: FlowMetadata[];
+  timestamp: number;
+}
+
+export interface FlowMetadata {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  ageMs: number;
+  participants: string[];
+  stepsCount: number;
+  steps: FlowStepSummary[];
+}
+
+export type VulnerabilitySeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
+export type VulnerabilityType =
+  | "injection"
+  | "xss"
+  | "weak-crypto"
+  | "hardcoded-secret"
+  | "dependency-vulnerability"
+  | "file-permission"
+  | "exposed-config"
+  | "missing-security-header"
+  | "other";
+
+export interface Vulnerability {
+  id: string;
+  type: VulnerabilityType;
+  severity: VulnerabilitySeverity;
+  title: string;
+  description: string;
+  file: string;
+  line?: number;
+  code?: string;
+  suggestedFix: string;
+  cveId?: string;
+  references?: string[];
+}
+
+export interface SecurityAuditStats {
+  filesScanned: number;
+  dependenciesChecked: number;
+  totalVulnerabilities: number;
+  bySeverity: Record<VulnerabilitySeverity, number>;
+  byType: Record<VulnerabilityType, number>;
+  scanDurationMs: number;
+}
+
+export interface SecurityAuditResult {
+  projectType: string;
+  vulnerabilities: Vulnerability[];
+  stats: SecurityAuditStats;
+  recommendations: string[];
+}

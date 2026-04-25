@@ -148,15 +148,15 @@ async function main() {
   );
 
   // Plugin bridge tools — used by IntelliJ MCPBridgeService
-  server.tool("agents/list", "List agents registered via plugin bridge", {}, async () => ({
+  server.tool("agents_list", "List agents registered via plugin bridge", {}, async () => ({
     content: [{ type: "text" as const, text: JSON.stringify({ agents: listAgents() }) }]
   }));
 
-  server.tool("tasks/active", "List active tasks from plugin bridge", {}, async () => ({
+  server.tool("tasks_active", "List active tasks from plugin bridge", {}, async () => ({
     content: [{ type: "text" as const, text: JSON.stringify({ tasks: listActiveTasks() }) }]
   }));
 
-  server.tool("agent/register", "Register an agent in the plugin bridge", {
+  server.tool("agent_register", "Register an agent in the plugin bridge", {
     id: z.string(),
     name: z.string(),
     type: z.string(),
@@ -166,7 +166,7 @@ async function main() {
     return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, agent }) }] };
   });
 
-  server.tool("task/start", "Start a task in the plugin bridge", {
+  server.tool("task_start", "Start a task in the plugin bridge", {
     taskId: z.string(),
     agentId: z.string(),
     description: z.string(),
@@ -175,7 +175,7 @@ async function main() {
     return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, task }) }] };
   });
 
-  server.tool("task/complete", "Complete a task in the plugin bridge", {
+  server.tool("task_complete", "Complete a task in the plugin bridge", {
     taskId: z.string(),
     agentId: z.string(),
     result: z.string().optional(),
@@ -305,6 +305,40 @@ async function main() {
     }
   );
 
+  // Monitoring tools — for plugin flow inspection
+  server.tool(
+    "flow_state",
+    "Get current state of all active flows, agents running, and their execution history. Used by IDE plugins to monitor multi-agent execution.",
+    {},
+    async () => {
+      const state = orchestrator.getFlowState();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(state, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "flow_get",
+    "Get details of a specific flow by ID, including participants, execution steps, and timestamps.",
+    {
+      flowId: z.string().describe("The flow ID to inspect"),
+    },
+    async ({ flowId }) => {
+      const flow = orchestrator.getFlowById(flowId);
+      if (!flow) {
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ error: `Flow "${flowId}" not found or expired` }, null, 2) }],
+        };
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(flow, null, 2) }],
+      };
+    }
+  );
+
+
+
   server.tool(
     "sandbox_execute",
     "Execute code in an isolated sandbox before using it in production. " +
@@ -402,7 +436,7 @@ async function main() {
         content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],
       };
     }
-  );
+  );  
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
