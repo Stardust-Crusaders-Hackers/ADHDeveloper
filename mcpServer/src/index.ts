@@ -37,7 +37,7 @@ async function main() {
   const args = new Set(rawArgs);
   const sseOnly = args.has("--sse") || process.env["MCP_SSE"] === "true";
   const stdioOnly = args.has("--stdio");
-  const port = parseInt(process.env["MCP_SSE_PORT"] ?? "3001", 10);
+  const port = parseInt(process.env["MCP_SSE_PORT"] ?? "2999", 10);
 
   const shared = await initSharedState();
 
