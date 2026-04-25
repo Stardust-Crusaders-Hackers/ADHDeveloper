@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { setupProject } from "./tools/setupProject.js";
+import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,6 +79,43 @@ async function main() {
       };
     }
   );
+
+  // Plugin bridge tools — used by IntelliJ MCPBridgeService
+  server.tool("agents/list", "List agents registered via plugin bridge", {}, async () => ({
+    content: [{ type: "text" as const, text: JSON.stringify({ agents: listAgents() }) }]
+  }));
+
+  server.tool("tasks/active", "List active tasks from plugin bridge", {}, async () => ({
+    content: [{ type: "text" as const, text: JSON.stringify({ tasks: listActiveTasks() }) }]
+  }));
+
+  server.tool("agent/register", "Register an agent in the plugin bridge", {
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    description: z.string().optional(),
+  }, async (params) => {
+    const agent = registerAgent({ ...params, description: params.description ?? "" });
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, agent }) }] };
+  });
+
+  server.tool("task/start", "Start a task in the plugin bridge", {
+    taskId: z.string(),
+    agentId: z.string(),
+    description: z.string(),
+  }, async (params) => {
+    const task = startTask(params);
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, task }) }] };
+  });
+
+  server.tool("task/complete", "Complete a task in the plugin bridge", {
+    taskId: z.string(),
+    agentId: z.string(),
+    result: z.string().optional(),
+  }, async ({ taskId, agentId, result }) => {
+    const task = completeTask(taskId, agentId, result ?? "");
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, task }) }] };
+  });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

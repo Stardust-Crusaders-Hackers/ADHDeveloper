@@ -12,6 +12,7 @@ import com.intellij.openapi.project.Project
 import java.io.File
 import java.io.PrintWriter
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
@@ -21,8 +22,13 @@ class MCPBridgeService(private val project: Project) : Disposable {
     private val mapper = jacksonObjectMapper()
     private var process: Process? = null
     private val readerThread = Executors.newSingleThreadExecutor()
+    private val pollExecutor = Executors.newSingleThreadScheduledExecutor()
     private val requestId = AtomicInteger(1)
     private var writer: PrintWriter? = null
+
+    // Track known IDs to detect new arrivals on each poll
+    private val knownAgentIds = mutableSetOf<String>()
+    private val knownTaskIds = mutableSetOf<String>()
 
     fun start(mcpDir: File) {
         val pb = ProcessBuilder("node", "dist/index.js")
@@ -33,41 +39,61 @@ class MCPBridgeService(private val project: Project) : Disposable {
 
         readerThread.submit { readLoop() }
 
-        send("agents/list", emptyMap<String, Any>())
-        send("tasks/active", emptyMap<String, Any>())
+        // MCP initialization handshake
+        sendRaw(mapOf(
+            "jsonrpc" to "2.0", "id" to requestId.getAndIncrement(),
+            "method" to "initialize",
+            "params" to mapOf(
+                "protocolVersion" to "2024-11-05",
+                "capabilities" to emptyMap<String, Any>(),
+                "clientInfo" to mapOf("name" to "IntelliJPlugin", "version" to "1.0")
+            )
+        ))
+
+        // Poll every 2s for agent/task state changes
+        pollExecutor.scheduleAtFixedRate({ poll() }, 2, 2, TimeUnit.SECONDS)
+    }
+
+    private fun poll() {
+        callTool("agents/list", emptyMap())
+        callTool("tasks/active", emptyMap())
     }
 
     private fun readLoop() {
         process?.inputStream?.bufferedReader()?.forEachLine { line ->
             try {
                 val msg = mapper.readTree(line)
-                if (msg.has("method")) handleNotification(msg)
-                else if (msg.has("id") && msg.has("result")) handleResponse(msg)
+                if (msg.has("id") && msg.has("result")) handleResponse(msg)
             } catch (_: Exception) {}
-        }
-    }
-
-    private fun handleNotification(msg: JsonNode) {
-        val params = msg["params"] ?: return
-        when (msg["method"].asText()) {
-            "agent/registered" -> registry.registerAgent(params.toAgent())
-            "task/started"     -> registry.startTask(params.toTask())
-            "task/completed"   -> registry.completeTask(
-                params["taskId"].asText(),
-                params["agentId"].asText(),
-                params["result"]?.asText() ?: ""
-            )
         }
     }
 
     private fun handleResponse(msg: JsonNode) {
         val result = msg["result"] ?: return
-        result["agents"]?.forEach { registry.registerAgent(it.toAgent()) }
-        result["tasks"]?.forEach { registry.startTask(it.toTask()) }
+        // MCP tool response: result.content[0].text contains JSON payload
+        val text = result["content"]?.get(0)?.get("text")?.asText() ?: return
+        val data = runCatching { mapper.readTree(text) }.getOrNull() ?: return
+
+        data["agents"]?.forEach { node ->
+            val agent = node.toAgent()
+            if (knownAgentIds.add(agent.id)) registry.registerAgent(agent)
+        }
+        data["tasks"]?.forEach { node ->
+            val task = node.toTask()
+            if (knownTaskIds.add(task.taskId)) registry.startTask(task)
+        }
     }
 
-    private fun send(method: String, params: Any) {
-        val payload = mapOf("jsonrpc" to "2.0", "id" to requestId.getAndIncrement(), "method" to method, "params" to params)
+    fun callTool(name: String, arguments: Map<String, Any>) {
+        sendRaw(mapOf(
+            "jsonrpc" to "2.0",
+            "id" to requestId.getAndIncrement(),
+            "method" to "tools/call",
+            "params" to mapOf("name" to name, "arguments" to arguments)
+        ))
+    }
+
+    private fun sendRaw(payload: Any) {
         writer?.println(mapper.writeValueAsString(payload))
     }
 
@@ -87,6 +113,7 @@ class MCPBridgeService(private val project: Project) : Disposable {
     )
 
     override fun dispose() {
+        pollExecutor.shutdownNow()
         process?.destroy()
         readerThread.shutdownNow()
     }
