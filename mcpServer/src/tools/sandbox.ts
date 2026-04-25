@@ -49,7 +49,7 @@ const DOCKER_IMAGES: Record<SandboxLanguage, string> = {
   javascript: "node:22-alpine",
   typescript: "node:22-alpine",
   python: "python:3.12-alpine",
-  bash: "alpine:latest",
+  bash: "bash:alpine",    // alpine:latest only has busybox sh — bash needs this image
   sh: "alpine:latest",
 };
 
@@ -67,11 +67,12 @@ function dockerRunCommand(language: SandboxLanguage, scriptPath: string): string
       return ["node", "--experimental-strip-types", scriptPath];
     case "python":
       return ["python3", scriptPath];
-    default:
-      return ["node", scriptPath];
     case "bash":
+      return ["bash", scriptPath];
     case "sh":
       return ["sh", scriptPath];
+    default:
+      return ["node", scriptPath];
   }
 }
 
@@ -144,7 +145,7 @@ async function runDocker(
 
   const dockerArgs = [
     "run", "--rm",
-    "--pull=missing",
+    "--pull=missing",    // pulls image on first run — may add latency outside timeoutMs
     `--memory=${limits.memoryMb}m`,
     `--memory-swap=${limits.memoryMb}m`,
     `--cpus=${limits.cpus}`,
