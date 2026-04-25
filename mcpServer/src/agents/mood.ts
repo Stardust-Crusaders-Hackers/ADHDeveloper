@@ -6,29 +6,29 @@ import { AgentDefinition } from "../types.js";
  */
 const moodAgent: AgentDefinition = {
   name: "mood-detector",
-  description: "Detecta sobrecarga cognitiva o frustración y ajusta el entorno.",
+  description: "Detects cognitive overload or frustration and adjusts the environment.",
   keywords: ["overwhelmed", "stressed", "frustrated", "tired", "anxious", "overload", "mood", "feeling"],
   handler: async (context) => {
     const { query } = context;
     const q = query.toLowerCase();
 
     let mood = "neutral";
-    let suggestion = "Mantén el ritmo actual.";
+    let suggestion = "Keep up the current pace.";
     let theme = "standard";
 
     if (q.includes("overwhelmed") || q.includes("agobiado") || q.includes("too much")) {
       mood = "overwhelmed";
-      suggestion = "Respiración profunda. Vamos a desglosar esto en 3 tareas ultra-simples.";
+      suggestion = "Deep breath. Let's break this down into 3 ultra-simple tasks.";
       theme = "calm-blue";
     } else if (q.includes("stuck") || q.includes("bloqueado") || q.includes("frustrated")) {
       mood = "stuck";
-      suggestion = "Cambio de aires. ¿Qué tal un descanso de 5 minutos o cambiar de archivo?";
+      suggestion = "Change of scenery. How about a 5-minute break or switching files?";
       theme = "energy-yellow";
     }
 
     return {
       success: true,
-      message: `🎨 **Modo ${mood.toUpperCase()} activado**\n${suggestion}`,
+      message: `🎨 **${mood.toUpperCase()} Mode activated**\n${suggestion}`,
       data: {
         mood,
         ui: {

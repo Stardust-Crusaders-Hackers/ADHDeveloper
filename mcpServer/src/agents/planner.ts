@@ -6,7 +6,7 @@ import { AgentDefinition } from "../types.js";
  */
 const plannerAgent: AgentDefinition = {
   name: "planner",
-  description: "Crea planes de desarrollo concisos mediante brainstorming y análisis de archivos.",
+  description: "Creates concise development plans through brainstorming and file analysis.",
   keywords: ["plan", "planning", "brainstorm", "roadmap", "feature", "strategy"],
   handler: async (context) => {
     const { query, metadata } = context;
@@ -19,25 +19,25 @@ const plannerAgent: AgentDefinition = {
     if (query.toLowerCase().includes("ui") || query.toLowerCase().includes("plugin")) relevantSuggestions.push("intelliJPlugin/");
 
     const analysis = files.length > 0 
-      ? files.map(f => `- **${f}**: Detectado punto de extensión para la feature.`).join('\n')
+      ? files.map(f => `- **${f}**: Detected extension point for the feature.`).join('\n')
       : relevantSuggestions.length > 0
-        ? `Sugerencias para análisis inicial:\n${relevantSuggestions.map(s => `- \`${s}\``).join('\n')}`
-        : '- No se detectaron archivos ni sugerencias automáticas.';
+        ? `Suggestions for initial analysis:\n${relevantSuggestions.map(s => `- \`${s}\``).join('\n')}`
+        : '- No files or automatic suggestions detected.';
 
     const plan = `
-# 🧠 Brainstorming para: "${query}"
-1. **MVP (Rápido)**: Implementar la lógica mínima en un solo archivo.
-2. **Estructurado**: Seguir el patrón de la arquitectura actual.
-3. **Escalable**: Preparar para futuras integraciones.
+# 🧠 Brainstorming for: "${query}"
+1. **MVP (Fast)**: Implement minimum logic in a single file.
+2. **Structured**: Follow current architecture pattern.
+3. **Scalable**: Prepare for future integrations.
 
-# 📂 Análisis del Contexto
+# 📂 Context Analysis
 ${analysis}
 
-# 🚀 Plan de Acción Conciso
-1. **Fase 1**: Identificar archivos "ancla" y puntos de inserción.
-2. **Fase 2**: Implementar prototipo funcional sin dependencias externas.
-3. **Fase 3**: Integrar con el resto del sistema.
-4. **Fase 4**: Validación visual y funcional.
+# 🚀 Concise Action Plan
+1. **Phase 1**: Identify "anchor" files and insertion points.
+2. **Phase 2**: Implement functional prototype without external dependencies.
+3. **Phase 3**: Integrate with the rest of the system.
+4. **Phase 4**: Visual and functional validation.
     `.trim();
 
     return {

@@ -4,44 +4,44 @@ import { AgentContext, AgentDefinition, AgentResult } from "../types.js";
 
 /**
  * Code Reviewer Agent
- * Especialidad: SOLID, Clean Code, Calidad.
- * Modos: 'exhaustive' (on-demand) o 'light' (automatic).
+ * Specialty: SOLID, Clean Code, Quality.
+ * Modes: 'exhaustive' (on-demand) or 'light' (automatic).
  */
 
 async function handler(ctx: AgentContext): Promise<AgentResult> {
   const query = ctx.query.toLowerCase();
   const metadata = ctx.metadata || {};
   
-  // Determinar modo: por metadatos o por keywords en la query
-  const isLight = metadata.mode === "light" || query.includes("light") || query.includes("ligero") || query.includes("auto");
-  const isExhaustive = !isLight || query.includes("exhaustive") || query.includes("exhaustivo") || query.includes("demand");
+  // Determine mode: by metadata or by keywords in the query
+  const isLight = metadata.mode === "light" || query.includes("light") || query.includes("auto");
+  const isExhaustive = !isLight || query.includes("exhaustive") || query.includes("demand");
 
   const projectRoot = (metadata.projectRoot as string) || process.cwd();
   const targetPath = (metadata.targetPath as string) || projectRoot;
 
-  // En un entorno real, aquí llamaríamos a un LLM para analizar el código.
-  // Como agente MCP, devolvemos una estructura que el orquestador/explainer usará.
+  // In a real environment, we would call an LLM here to analyze the code.
+  // As an MCP agent, we return a structure that the orchestrator/explainer will use.
   
   let reviewMessage = "";
   
   if (isLight) {
-    reviewMessage = "### ⚡ Code Review Ligera (Automática)\n" +
-                    "Revisando cambios recientes para prevenir fallos críticos...\n\n" +
-                    "- **Estado:** ✅ Sin bloqueos evidentes.\n" +
-                    "- **Nota:** Se mantiene el enfoque en la velocidad. No se detectan violaciones graves de seguridad o sintaxis.";
+    reviewMessage = "### ⚡ Light Code Review (Automatic)\n" +
+                    "Reviewing recent changes to prevent critical failures...\n\n" +
+                    "- **Status:** ✅ No obvious blockers.\n" +
+                    "- **Note:** Maintaining focus on speed. No serious security or syntax violations detected.";
   } else {
-    reviewMessage = "### 🔍 Code Review Exhaustiva (SOLID & Clean Code)\n" +
-                    "Analizando arquitectura y adherencia a buenas prácticas...\n\n" +
-                    "#### 1. Principios SOLID\n" +
-                    "- **SRP:** Se verifica que cada clase/función tenga una única responsabilidad.\n" +
-                    "- **OCP:** Análisis de extensibilidad sin modificación.\n" +
-                    "- **LSP/ISP/DIP:** Revisión de interfaces y dependencias.\n\n" +
+    reviewMessage = "### 🔍 Exhaustive Code Review (SOLID & Clean Code)\n" +
+                    "Analyzing architecture and adherence to best practices...\n\n" +
+                    "#### 1. SOLID Principles\n" +
+                    "- **SRP:** Verifying that each class/function has a single responsibility.\n" +
+                    "- **OCP:** Extensibility analysis without modification.\n" +
+                    "- **LSP/ISP/DIP:** Review of interfaces and dependencies.\n\n" +
                     "#### 2. Clean Code\n" +
-                    "- Nombramiento semántico.\n" +
-                    "- Reducción de complejidad ciclomática.\n" +
-                    "- Eliminación de código muerto.\n\n" +
-                    "#### 3. Conclusión\n" +
-                    "El código es robusto pero se sugieren pequeñas refactorizaciones en la capa de servicios para mejorar el desacoplamiento.";
+                    "- Semantic naming.\n" +
+                    "- Reduction of cyclomatic complexity.\n" +
+                    "- Removal of dead code.\n\n" +
+                    "#### 3. Conclusion\n" +
+                    "The code is robust but minor refactorings in the service layer are suggested to improve decoupling.";
   }
 
   return {
@@ -57,7 +57,7 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
 
 const definition: AgentDefinition = {
   name: "codeReviewer",
-  description: "Especialista en calidad de código, SOLID y Clean Code. Ofrece revisiones exhaustivas bajo demanda o ligeras en modo automático.",
+  description: "Specialist in code quality, SOLID, and Clean Code. Offers exhaustive reviews on-demand or light reviews in automatic mode.",
   keywords: [
     "review",
     "code-review",
@@ -65,8 +65,6 @@ const definition: AgentDefinition = {
     "clean-code",
     "refactor",
     "quality",
-    "calidad",
-    "revisar",
     "best-practices"
   ],
   handler,

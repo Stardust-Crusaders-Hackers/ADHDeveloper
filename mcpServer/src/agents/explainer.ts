@@ -1,28 +1,11 @@
 import { AgentContext, AgentDefinition, AgentResult } from "../types.js";
+import { LanguageService } from "../languageService.js";
 
-type Lang = "es" | "en";
 type FlowStepInput = {
   agentName: string;
   success: boolean;
   messageExcerpt: string;
 };
-
-function detectLanguage(input: string): Lang {
-  const lowered = input.toLowerCase();
-  const spanishHints = [
-    " que ", " los ", " las ", " el ", " la ", " un ", " una ", " de ", " y ",
-    "agente", "codigo", "código", "sesion", "sesión", "explica", "explicar",
-  ];
-  const englishHints = [
-    " the ", " and ", " with ", " for ", "what", "agent", "code", "session", "explain",
-  ];
-
-  const esScore = spanishHints.filter((hint) => lowered.includes(hint)).length;
-  const enScore = englishHints.filter((hint) => lowered.includes(hint)).length;
-
-  if (enScore > esScore) return "en";
-  return "es";
-}
 
 function sanitizeSnippet(value: unknown, maxLength = 140): string {
   if (typeof value !== "string") return "";
@@ -88,10 +71,11 @@ function parseFlowParticipants(metadata: Record<string, unknown> | undefined, st
   return participants;
 }
 
-function toFlowSummaryLine(lang: Lang, agentName: string, steps: FlowStepInput[]): [string, string] {
+function toFlowSummaryLine(lang: "en" | "es", agentName: string, steps: FlowStepInput[]): [string, string] {
   const total = steps.length;
   const failed = steps.filter((step) => !step.success).length;
   const latest = steps[steps.length - 1];
+  
   const excerpt = latest?.messageExcerpt || (lang === "en" ? "No output details were captured" : "No se capturaron detalles de salida");
   const health = failed === 0
     ? (lang === "en" ? "completed without failures" : "terminó sin fallos")
@@ -110,7 +94,7 @@ function toFlowSummaryLine(lang: Lang, agentName: string, steps: FlowStepInput[]
   ];
 }
 
-function buildFlowSummary(lang: Lang, participants: string[], steps: FlowStepInput[]): string {
+function buildFlowSummary(lang: "en" | "es", participants: string[], steps: FlowStepInput[]): string {
   const header = lang === "en" ? "Final flow summary by agent:" : "Resumen final del flujo por agente:";
   const blocks: string[] = [header];
 
@@ -131,48 +115,22 @@ function buildFlowSummary(lang: Lang, participants: string[], steps: FlowStepInp
   return blocks.join("\n\n");
 }
 
-function buildSpanish(agentWork: string, codeWork: string, queryFallback: string): string {
+function buildMessage(lang: "en" | "es", agentWork: string, codeWork: string, queryFallback: string): string {
   if (!agentWork && !codeWork && !queryFallback) {
-    return twoSentences(
-      "No tengo contexto suficiente sobre actividad de agentes ni código completado",
-      "Cuando llegue datos reales, prometo dejar de leer bolas de cristal del backlog"
-    );
+    return lang === "en" 
+      ? twoSentences("I lack enough context about agent activity and completed code", "Once real details show up, I will stop pretending the backlog is a fortune teller")
+      : twoSentences("No tengo contexto suficiente sobre actividad de agentes ni código completado", "Cuando lleguen datos reales, prometo dejar de leer bolas de cristal del backlog");
   }
 
-  const first = agentWork && codeWork
-    ? `Agentes están ${agentWork} y código completado fue ${codeWork}`
-    : agentWork
-      ? `Agentes ahora están ${agentWork}`
-      : codeWork
-        ? `Código completado en sesión fue ${codeWork}`
-        : `Lo más claro que recibí para explicar fue ${queryFallback}`;
+  const first = lang === "en"
+    ? (agentWork && codeWork ? `Agents are ${agentWork} and completed code was ${codeWork}` : agentWork ? `Agents are currently ${agentWork}` : codeWork ? `Completed code in this session was ${codeWork}` : `Best explainable signal I received was ${queryFallback}`)
+    : (agentWork && codeWork ? `Agentes están ${agentWork} y código completado fue ${codeWork}` : agentWork ? `Agentes ahora están ${agentWork}` : codeWork ? `Código completado en sesión fue ${codeWork}` : `Lo más claro que recibí para explicar fue ${queryFallback}`);
 
-  return twoSentences(
-    first,
-    "Resumen en dos golpes para que se entienda rápido, porque nadie quiere arqueología en el chat"
-  );
-}
+  const second = lang === "en"
+    ? "Two-line summary for fast recall, because nobody wants to excavate a chat log for one answer"
+    : "Resumen en dos golpes para que se entienda rápido, porque nadie quiere arqueología en el chat";
 
-function buildEnglish(agentWork: string, codeWork: string, queryFallback: string): string {
-  if (!agentWork && !codeWork && !queryFallback) {
-    return twoSentences(
-      "I lack enough context about agent activity and completed code",
-      "Once real details show up, I will stop pretending the backlog is a fortune teller"
-    );
-  }
-
-  const first = agentWork && codeWork
-    ? `Agents are ${agentWork} and completed code was ${codeWork}`
-    : agentWork
-      ? `Agents are currently ${agentWork}`
-      : codeWork
-        ? `Completed code in this session was ${codeWork}`
-        : `Best explainable signal I received was ${queryFallback}`;
-
-  return twoSentences(
-    first,
-    "Two-line summary for fast recall, because nobody wants to excavate a chat log for one answer"
-  );
+  return twoSentences(first, second);
 }
 
 async function handler(ctx: AgentContext): Promise<AgentResult> {
@@ -180,79 +138,34 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
   const flowSteps = parseFlowSteps(metadata);
   const flowParticipants = parseFlowParticipants(metadata, flowSteps);
 
-  const agentWork = pickFirstText(metadata, [
-    "agentWork",
-    "agentActions",
-    "agentsDoing",
-    "activitySummary",
-    "agentSummary",
-  ]);
-
-  const codeWork = pickFirstText(metadata, [
-    "codeSummary",
-    "completedCode",
-    "completedWork",
-    "changesSummary",
-    "implementationSummary",
-  ]);
-
+  const agentWork = pickFirstText(metadata, ["agentWork", "agentActions", "agentsDoing", "activitySummary", "agentSummary"]);
+  const codeWork = pickFirstText(metadata, ["codeSummary", "completedCode", "completedWork", "changesSummary", "implementationSummary"]);
   const queryFallback = sanitizeSnippet(ctx.query, 120);
-  const lang = detectLanguage(`${ctx.query} ${agentWork} ${codeWork} ${flowParticipants.join(" ")}`);
+
+  const lang = LanguageService.detectLanguage(`${ctx.query} ${agentWork} ${codeWork} ${flowParticipants.join(" ")}`);
 
   if (flowSteps.length > 0 || flowParticipants.length > 0) {
     const message = buildFlowSummary(lang, flowParticipants, flowSteps);
     return {
       success: true,
       message,
-      data: {
-        language: lang,
-        format: "flow-summary",
-        participants: flowParticipants,
-        stepsCount: flowSteps.length,
-      },
+      data: { language: lang, format: "flow-summary", participants: flowParticipants, stepsCount: flowSteps.length },
     };
   }
 
-  const message = lang === "en"
-    ? buildEnglish(agentWork, codeWork, queryFallback)
-    : buildSpanish(agentWork, codeWork, queryFallback);
+  const message = buildMessage(lang, agentWork, codeWork, queryFallback);
 
   return {
     success: true,
     message,
-    data: {
-      language: lang,
-      format: "two-sentences",
-      humor: "light-sarcastic",
-      used: {
-        agentWork: Boolean(agentWork),
-        codeWork: Boolean(codeWork),
-        queryFallback: Boolean(queryFallback),
-      },
-    },
+    data: { language: lang, format: "two-sentences", humor: "light-sarcastic", used: { agentWork: Boolean(agentWork), codeWork: Boolean(codeWork), queryFallback: Boolean(queryFallback) } },
   };
 }
 
 const explainerAgent: AgentDefinition = {
   name: "explainer",
-  description:
-    "Resume flujos de trabajo multi-agente por participante y mantiene modo de dos frases cuando no hay contexto de flujo.",
-  keywords: [
-    "explain",
-    "explainer",
-    "summary",
-    "summarize",
-    "resume",
-    "resumen",
-    "explica",
-    "explicar",
-    "agents",
-    "codigo",
-    "código",
-    "session",
-    "sesion",
-    "sesión",
-  ],
+  description: "Summarizes multi-agent workflows by participant and maintains a two-sentence mode when no flow context is available.",
+  keywords: ["explain", "explainer", "summary", "summarize", "resume", "agents", "code", "session"],
   handler,
 };
 
