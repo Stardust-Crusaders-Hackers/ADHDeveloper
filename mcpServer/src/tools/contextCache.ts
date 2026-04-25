@@ -25,6 +25,7 @@ export interface TextContentBlock {
   type: "text";
   text: string;
   cache_control?: CacheControl;
+  cache_placement?: "start" | "end" | "adjacent";
 }
 
 export interface CacheInfo {
@@ -46,6 +47,22 @@ const cache = new Map<string, CacheEntry>();
 let totalMisses = 0;
 const EPHEMERAL_CACHE_CONTROL: CacheControl = { type: "ephemeral" };
 
+const AVG_BYTES_PER_TOKEN = Number(process.env.AVG_BYTES_PER_TOKEN) || 4;
+
+/**
+ * Return threshold in bytes to mark an entry ephemeral.
+ * Priority: EPHEMERAL_CACHE_MIN_TOKENS -> EPHEMERAL_CACHE_THRESHOLD_BYTES -> default 1024.
+ */
+function getEphemeralThresholdBytes(): number {
+  const minTokens = Number(process.env.EPHEMERAL_CACHE_MIN_TOKENS);
+  if (!Number.isNaN(minTokens) && minTokens > 0) {
+    return Math.max(1024, Math.floor(minTokens * AVG_BYTES_PER_TOKEN));
+  }
+  const envBytes = Number(process.env.EPHEMERAL_CACHE_THRESHOLD_BYTES);
+  if (!Number.isNaN(envBytes) && envBytes > 0) return Math.floor(envBytes);
+  return 1024;
+}
+
 // ─── Core operations ──────────────────────────────────────────────────────────
 
 /**
@@ -64,7 +81,7 @@ export function readFile(filePath: string): ReadResult {
       source: "cache",
       sizeBytes: existing.sizeBytes,
       hits: existing.hits,
-      cacheControl: existing.sizeBytes > 1024 ? EPHEMERAL_CACHE_CONTROL : undefined,
+      cacheControl: existing.sizeBytes > getEphemeralThresholdBytes() ? EPHEMERAL_CACHE_CONTROL : undefined,
     };
   }
 
@@ -84,16 +101,19 @@ export function readFile(filePath: string): ReadResult {
     source: "disk",
     sizeBytes: entry.sizeBytes,
     hits: 0,
-    cacheControl: entry.sizeBytes > 1024 ? EPHEMERAL_CACHE_CONTROL : undefined,
+    cacheControl: entry.sizeBytes > getEphemeralThresholdBytes() ? EPHEMERAL_CACHE_CONTROL : undefined,
   };
 }
 
-export function toTextContentBlock(result: ReadResult, prefix: string): TextContentBlock {
-  return {
+export function toTextContentBlock(result: ReadResult, prefix: string, placement: "start" | "end" | "adjacent" = "adjacent"): TextContentBlock {
+  const text = `${prefix}\n\n${result.content}`;
+  const block: TextContentBlock = {
     type: "text",
-    text: `${prefix}\n\n${result.content}`,
+    text,
     ...(result.cacheControl ? { cache_control: result.cacheControl } : {}),
+    ...(result.cacheControl ? { cache_placement: placement } : {}),
   };
+  return block;
 }
 
 /** Return metadata about all cached files + aggregate stats. No file I/O. */

@@ -7,6 +7,7 @@ export interface FlowStepSummary {
   agentName: string;
   success: boolean;
   messageExcerpt: string;
+  originalSteps?: number;
 }
 
 export interface ExecuteAgentFlowData {

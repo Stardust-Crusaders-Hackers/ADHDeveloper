@@ -5,6 +5,7 @@ type FlowStepInput = {
   agentName: string;
   success: boolean;
   messageExcerpt: string;
+  originalSteps?: number;
 };
 
 function sanitizeSnippet(value: unknown, maxLength = 140): string {
@@ -44,10 +45,12 @@ function parseFlowSteps(metadata: Record<string, unknown> | undefined): FlowStep
       const row = raw as Record<string, unknown>;
       const agentName = typeof row.agentName === "string" ? row.agentName.trim() : "";
       if (!agentName) return null;
+      const originalSteps = typeof row.originalSteps === "number" && Number(row.originalSteps) > 0 ? Math.floor(Number(row.originalSteps)) : 1;
       return {
         agentName,
         success: row.success !== false,
         messageExcerpt: sanitizeSnippet(row.messageExcerpt, 180),
+        originalSteps,
       };
     })
     .filter((row): row is FlowStepInput => row !== null);
@@ -72,8 +75,8 @@ function parseFlowParticipants(metadata: Record<string, unknown> | undefined, st
 }
 
 function toFlowSummaryLine(lang: Language, agentName: string, steps: FlowStepInput[]): [string, string] {
-  const total = steps.length;
-  const failed = steps.filter((step) => !step.success).length;
+  const total = steps.reduce((sum, s) => sum + (s.originalSteps ?? 1), 0);
+  const failed = steps.reduce((sum, s) => sum + ((s.success ? 0 : (s.originalSteps ?? 1))), 0);
   const latest = steps[steps.length - 1];
 
   const translations: any = {
