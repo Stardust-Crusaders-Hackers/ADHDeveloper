@@ -20,6 +20,9 @@ import okhttp3.Response
 import okhttp3.sse.EventSource
 import okhttp3.sse.EventSourceListener
 import okhttp3.sse.EventSources
+import java.io.BufferedOutputStream
+import java.io.InputStream
+import java.io.File
 import java.io.IOException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -42,8 +45,68 @@ class MCPBridgeService(private val project: Project) : Disposable {
     private var activeTasksById = mutableMapOf<String, RunningAgentNode>()
 
     private var mcpClient: SseMcpClient? = null
+    private var serverProcess: Process? = null
     private var mcpFailureCount: Int = 0
     private var nextMcpAttemptAt: Long = 0L
+    private var pollingStarted: Boolean = false
+
+    private val probeClient = OkHttpClient.Builder()
+        .connectTimeout(2, TimeUnit.SECONDS)
+        .readTimeout(2, TimeUnit.SECONDS)
+        .build()
+
+    fun startWithFallback(mcpDir: File?) {
+        val settings = StageSettingsState.getInstance()
+        val serverUrl = settings.mcpServerUrl.ifEmpty { "http://localhost:3001" }
+
+        if (!isServerRunning(serverUrl)) {
+            if (mcpDir != null) {
+                spawnServer(mcpDir, serverUrl)
+            } else {
+                System.err.println("[MCP] SSE server not reachable and no mcpDir — bridge disabled")
+                return
+            }
+        }
+
+        start()
+    }
+
+    private fun isServerRunning(serverUrl: String): Boolean {
+        return try {
+            val request = Request.Builder().url("$serverUrl/health").get().build()
+            probeClient.newCall(request).execute().use { it.isSuccessful }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun spawnServer(mcpDir: File, serverUrl: String) {
+        val distEntry = File(mcpDir, "dist/index.js")
+        if (!distEntry.exists()) {
+            System.err.println("[MCP] dist/index.js not found at ${distEntry.absolutePath} — cannot spawn server")
+            return
+        }
+
+        System.err.println("[MCP] Spawning SSE server from ${mcpDir.absolutePath}")
+        serverProcess = ProcessBuilder("node", distEntry.absolutePath, "--sse")
+            .directory(mcpDir)
+            .redirectErrorStream(true)
+            .start()
+
+        val deadline = System.currentTimeMillis() + 10_000L
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(500)
+            if (isServerRunning(serverUrl)) {
+                System.err.println("[MCP] Spawned server ready at $serverUrl")
+                return
+            }
+            if (serverProcess?.isAlive == false) {
+                System.err.println("[MCP] Spawned server exited prematurely")
+                return
+            }
+        }
+        System.err.println("[MCP] Spawned server did not become ready within 10s")
+    }
 
     @Synchronized
     fun start() {
@@ -58,11 +121,12 @@ class MCPBridgeService(private val project: Project) : Disposable {
         closeMcpClient()
         knownAgentIds.addAll(registry.getAgents().map { it.agent.id })
 
-        try {
+        if (!pollingStarted) {
+            pollingStarted = true
             pollExecutor.scheduleAtFixedRate({ poll() }, 1, 1, TimeUnit.SECONDS)
             System.err.println("[MCP] Polling scheduled.")
-        } catch (e: Exception) {
-            System.err.println("[MCP] Polling already active or failed to schedule: ${e.message}")
+        } else {
+            System.err.println("[MCP] Polling already active, reusing existing schedule.")
         }
     }
 
@@ -185,6 +249,8 @@ class MCPBridgeService(private val project: Project) : Disposable {
     override fun dispose() {
         pollExecutor.shutdownNow()
         closeMcpClient()
+        serverProcess?.destroyForcibly()
+        serverProcess = null
     }
 
     private fun ensureMcpClient(serverUrl: String): SseMcpClient {
