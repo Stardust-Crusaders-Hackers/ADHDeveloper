@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { setupProject } from "./tools/setupProject.js";
+import { readFile, getCacheInfo, invalidate, clearCache } from "./tools/contextCache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -76,6 +77,61 @@ async function main() {
       const result = await setupProject(projectPath);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "read_file_cached",
+    "Read a file from disk and cache its content in memory. Subsequent reads of the same path return from cache — no disk I/O, no redundant context. Use this instead of raw file reads whenever you may need a file more than once in a session.",
+    {
+      path: z.string().describe("Absolute or relative path to the file"),
+    },
+    async ({ path: filePath }) => {
+      const result = readFile(filePath);
+      const meta = result.source === "cache"
+        ? `[CACHE HIT — hit #${result.hits}, ${result.sizeBytes} bytes, no disk read]`
+        : `[DISK READ — cached for future calls, ${result.sizeBytes} bytes]`;
+      return {
+        content: [{ type: "text" as const, text: `${meta}\n\n${result.content}` }],
+      };
+    }
+  );
+
+  server.tool(
+    "cache_info",
+    "Show all files currently held in the context cache: paths, sizes, hit counts, and aggregate stats. Use before reading a file to check if it is already cached.",
+    {},
+    async () => {
+      const info = getCacheInfo();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(info, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "cache_invalidate",
+    "Remove a specific file from the context cache so the next read_file_cached call fetches a fresh copy from disk. Use when you know a file has changed.",
+    {
+      path: z.string().describe("Absolute or relative path to the file to evict"),
+    },
+    async ({ path: filePath }) => {
+      const removed = invalidate(filePath);
+      return {
+        content: [{ type: "text" as const, text: removed ? `Evicted: ${filePath}` : `Not in cache: ${filePath}` }],
+      };
+    }
+  );
+
+  server.tool(
+    "cache_clear",
+    "Clear the entire context cache. All subsequent file reads will go to disk.",
+    {},
+    async () => {
+      const count = clearCache();
+      return {
+        content: [{ type: "text" as const, text: `Cleared ${count} cached file(s).` }],
       };
     }
   );
