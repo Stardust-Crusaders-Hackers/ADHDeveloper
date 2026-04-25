@@ -3,7 +3,6 @@ package com.example.mcpassistant.ui
 import com.example.mcpassistant.model.Agent
 import com.example.mcpassistant.model.AgentTask
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.components.JBPanel
 import java.awt.*
 import java.util.concurrent.ConcurrentHashMap
@@ -43,18 +42,15 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     // ── StageUIListener ──────────────────────────────────────────────────────
 
     override fun onAgentRegistered(agent: Agent) {
-        SwingUtilities.invokeLater {
-            val avatar = AvatarComponent(agent)
-            avatarMap[agent.id] = avatar
-            audiencePanel.addAgent(avatar)
-            animEngine.trackIdle(avatar)
+        runOnUiThread {
+            registerAvatar(agent)
         }
     }
 
     override fun onTaskStarted(task: AgentTask) {
-        SwingUtilities.invokeLater {
-            val avatar = avatarMap[task.agentId] ?: return@invokeLater
-            val seatPos = audiencePanel.getSeatPosition(avatar) ?: return@invokeLater
+        runOnUiThread {
+            val avatar = avatarMap[task.agentId] ?: return@runOnUiThread
+            val seatPos = audiencePanel.getSeatPosition(avatar) ?: return@runOnUiThread
 
             animEngine.untrackIdle(avatar)
             avatar.state = AvatarComponent.State.WALKING
@@ -81,8 +77,8 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
 
     override fun onTaskCompleted(taskId: String, agentId: String, result: String) {
         if (agentId in presentingAgents) return  // presentación en curso, ignorar
-        SwingUtilities.invokeLater {
-            val avatar = avatarMap[agentId] ?: return@invokeLater
+        runOnUiThread {
+            val avatar = avatarMap[agentId] ?: return@runOnUiThread
 
             animEngine.disappear(avatar) {
                 SwingUtilities.invokeLater {
@@ -119,8 +115,8 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     }
 
     override fun onStagePresentation(presentationId: String, agentId: String, text: String) {
-        SwingUtilities.invokeLater {
-            val avatar = avatarMap[agentId] ?: return@invokeLater
+        runOnUiThread {
+            val avatar = ensureAvatar(agentId)
 
             presentingAgents.add(agentId)
             animEngine.cancelAnimationsFor(avatar)  // cancelar cualquier animación previa
@@ -189,6 +185,35 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private fun ensureAvatar(agentId: String): AvatarComponent {
+        return avatarMap[agentId] ?: run {
+            val fallbackAgent = Agent(
+                id = agentId,
+                name = agentId,
+                type = "agent",
+                description = "Auto-registered from presentation event"
+            )
+            registerAvatar(fallbackAgent)
+        }
+    }
+
+    private fun registerAvatar(agent: Agent): AvatarComponent {
+        return avatarMap.computeIfAbsent(agent.id) {
+            AvatarComponent(agent).also { avatar ->
+                audiencePanel.addAgent(avatar)
+                animEngine.trackIdle(avatar)
+            }
+        }
+    }
+
+    private inline fun runOnUiThread(crossinline block: () -> Unit) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            block()
+        } else {
+            SwingUtilities.invokeLater { block() }
+        }
+    }
 
     private fun buildHumorText(task: AgentTask): String {
         val openers = listOf(
