@@ -12,30 +12,32 @@ import java.io.File
 
 class McpInstallStartupActivity : StartupActivity.DumbAware {
     override fun runActivity(project: Project) {
-        if (!StageSettingsState.getInstance().mcpEnabled) return
-
         ApplicationManager.getApplication().executeOnPooledThread {
-            val mcpDir = findMcpServerDir(project) ?: run {
-                notify(project, "Agent Stage: mcpServer directory not found", NotificationType.ERROR)
-                return@executeOnPooledThread
-            }
-
-            val nodeOk = ProcessBuilder("node", "--version").start().waitFor() == 0
-            if (!nodeOk) {
-                notify(project, "Agent Stage: Node.js not found — install Node.js 18+", NotificationType.WARNING)
-                return@executeOnPooledThread
-            }
-
-            if (!File(mcpDir, "node_modules").exists()) {
-                ProcessBuilder("npm", "install").directory(mcpDir).start().waitFor()
-            }
-
-            if (!File(mcpDir, "dist").exists()) {
-                ProcessBuilder("npm", "run", "build").directory(mcpDir).start().waitFor()
-            }
-
+            val mcpDir = resolveMcpDir(project)
             project.service<MCPBridgeService>().start(mcpDir)
         }
+    }
+
+    private fun resolveMcpDir(project: Project): File? {
+        if (!StageSettingsState.getInstance().mcpEnabled) return null
+        val dir = findMcpServerDir(project) ?: return null
+
+        val nodeOk = try {
+            ProcessBuilder("node", "--version").start().waitFor() == 0
+        } catch (_: Exception) { false }
+
+        if (!nodeOk) {
+            notify(project, "Agent Stage: Node.js not found — MCP disabled, state-file polling active", NotificationType.WARNING)
+            return null
+        }
+
+        if (!File(dir, "node_modules").exists()) {
+            ProcessBuilder("npm", "install").directory(dir).start().waitFor()
+        }
+        if (!File(dir, "dist").exists()) {
+            ProcessBuilder("npm", "run", "build").directory(dir).start().waitFor()
+        }
+        return dir
     }
 
     private fun findMcpServerDir(project: Project): File? {

@@ -44,7 +44,7 @@ class MCPBridgeService(private val project: Project) : Disposable {
     private var mcpFailureCount: Int = 0
     private var nextMcpAttemptAt: Long = 0L
 
-    fun start(mcpDir: File) {
+    fun start(mcpDir: File? = null) {
         this.mcpDir = mcpDir
         knownAgentIds.addAll(registry.getAgents().map { it.agent.id })
         pollExecutor.scheduleAtFixedRate({ poll() }, 1, 1, TimeUnit.SECONDS)

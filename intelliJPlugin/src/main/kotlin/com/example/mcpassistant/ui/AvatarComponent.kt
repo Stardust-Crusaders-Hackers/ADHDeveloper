@@ -28,7 +28,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     private val renderer = AvatarRendererRegistry.get(agent.type)
 
     init {
-        preferredSize = Dimension(72, 88)
+        preferredSize = Dimension(58, 72)
         toolTipText = "${agent.name} (${agent.type})"
         isOpaque = false
     }
@@ -49,7 +49,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
             stageScale
 
         val cx = width / 2
-        val avatarSize = (64 * breathScale).toInt().coerceAtLeast(8)
+        val avatarSize = (52 * breathScale).toInt().coerceAtLeast(8)
         val avatarBounds = Rectangle(cx - avatarSize / 2, 0, avatarSize, avatarSize)
 
         if (state == State.SEATED_LOOK_AROUND) {
@@ -73,7 +73,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     private fun drawHeadAndBody(g2d: Graphics2D, bounds: Rectangle, cx: Int) {
         drawHead(g2d, bounds)
         renderer?.drawBody(g2d, bounds, animFrame, state)
-        renderer?.drawRoleIcon(g2d, cx, bounds.y + bounds.height / 2, 12)
+        renderer?.drawRoleIcon(g2d, cx, bounds.y + bounds.height / 2, 10)
         drawEyes(g2d, bounds)
     }
 

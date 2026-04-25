@@ -18,16 +18,10 @@ class StageCenterPanel : JPanel() {
         background = Color(10, 10, 25)
         preferredSize = Dimension(400, 220)
 
-        // Re-center avatar whenever the panel is resized
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent) {
-                activeAvatar?.let { avatar ->
-                    val aSize = Dimension(128, 156)
-                    val x = (width - aSize.width) / 2
-                    val y = (height - aSize.height) / 2 - 10
-                    avatar.bounds = Rectangle(x, y, aSize.width, aSize.height)
-                    repaint()
-                }
+                activeAvatar?.let { centerAvatar(it) }
+                repaint()
             }
         })
     }
@@ -35,20 +29,10 @@ class StageCenterPanel : JPanel() {
     fun showAvatar(avatar: AvatarComponent) {
         activeAvatar?.let { remove(it) }
         activeAvatar = avatar
-
-        // Remove from any previous parent (e.g. StagePanel root during walk)
         avatar.parent?.remove(avatar)
-
-        // Center avatar on stage using actual size, fallback to preferredSize
-        val aSize = Dimension(128, 156)
-        val panelW = if (width > 0) width else preferredSize.width
-        val panelH = if (height > 0) height else preferredSize.height
-        val x = (panelW - aSize.width) / 2
-        val y = (panelH - aSize.height) / 2 - 10
-        avatar.bounds = Rectangle(x, y, aSize.width, aSize.height)
         avatar.stageScale = 2f
+        centerAvatar(avatar)
         add(avatar)
-
         fadeInSpotlight()
         revalidate()
         repaint()
@@ -59,6 +43,13 @@ class StageCenterPanel : JPanel() {
         activeAvatar?.let { remove(it) }
         activeAvatar = null
         fadeOutSpotlight()
+    }
+
+    private fun centerAvatar(avatar: AvatarComponent) {
+        val aW = 104; val aH = 128
+        val panelW = if (width > 0) width else preferredSize.width
+        val panelH = if (height > 0) height else preferredSize.height
+        avatar.bounds = Rectangle((panelW - aW) / 2, (panelH - aH) / 2 - 10, aW, aH)
     }
 
     private fun fadeInSpotlight() {
