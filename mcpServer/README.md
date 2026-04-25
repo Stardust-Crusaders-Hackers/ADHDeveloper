@@ -28,7 +28,7 @@ Add this to your `claude_desktop_config.json`:
 - `orchestrate`: Route tasks to specific agents.
 - `execute_agent`: Run a specific agent (planner, focus-timer, mood-detector, repo-initializer, documenter, smoke-tester, explainer).
 - `list_agents`: See available agents.
-- `setup_project`: Configure local project environments.
+- `setup_project`: Configure MCP for Claude Code, OpenAI Codex, Gemini CLI, Junie, GitHub Copilot CLI, Copilot VS Code, and Cursor.
 - `repo_bootstrap`: Scaffold a repository from structured requirements (multi-stack, architecture, Docker/Nginx optional, safe conflict policy).
 
 ## Development
