@@ -145,8 +145,11 @@ async function suiteFileSystem(projectRoot: string): Promise<TestResult[]> {
     ["fs:package-json", path.join(projectRoot, "package.json")],
     ["fs:tsconfig", path.join(projectRoot, "tsconfig.json")],
     ["fs:context-cache-tool", path.join(projectRoot, "src", "tools", "contextCache.ts")],
+    ["fs:test-playbook-tool", path.join(projectRoot, "src", "tools", "testPlaybook.ts")],
     ["fs:rules-tool", path.join(projectRoot, "src", "tools", "rules.ts")],
     ["fs:documenter-agent", path.join(projectRoot, "src", "agents", "documenter.ts")],
+    ["fs:debugger-agent", path.join(projectRoot, "src", "agents", "debugger.ts")],
+    ["fs:test-playbook", path.join(projectRoot, "TESTS.md")],
   ] as const;
 
   return Promise.all(
