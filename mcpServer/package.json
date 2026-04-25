@@ -36,12 +36,12 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
-    "tsx": "^4.19.0",
-    "typescript": "^5.0.0"
+    "@types/node": "22.19.17",
+    "tsx": "4.19.0",
+    "typescript": "5.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.0",
-    "zod": "^3.23.0"
+    "@modelcontextprotocol/sdk": "1.10.0",
+    "zod": "3.23.0"
   }
 }
