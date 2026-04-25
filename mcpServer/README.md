@@ -1,49 +1,27 @@
-# ADHDeveloper MCP Server
+# mcpServer
 
-MCP server designed to assist developers with ADHD through concise planning, focus management, and mood-aware workflows.
+Overview
 
----
+`mcpServer` is the core Node.js implementation of ADHDeveloper. It provides a set of named agents, tools, and the MCP transport logic used by clients. The server is distributed as a Docker image for easy usage, and also runs locally for development.
 
-## Docker (Recommended)
+Docker (recommended)
 
-The server is published on Docker Hub as [`imaandrw/mcp-app`](https://hub.docker.com/r/imaandrw/mcp-app).
-
-No Node.js or local install needed — pull and run.
+The official image is published on Docker Hub as `imaandrw/mcp-app`.
 
 ```bash
 docker pull imaandrw/mcp-app:latest
-```
-
-ADHDeveloper runs as a **stdio MCP server** inside the container. Your MCP client starts the container, communicates over stdin/stdout, and the container exits when the client disconnects.
-
-```bash
 docker run -i --rm imaandrw/mcp-app:latest
 ```
 
-- `-i` keeps stdin open (required for stdio transport)
-- `--rm` removes the container on exit
+Notes:
+- `-i` keeps stdin open (required for stdio transport).
+- `--rm` removes the container when it exits.
 
-### Client Configuration (Docker)
+Client configuration examples
 
-#### Claude Code
+Use the same `docker run` invocation for any client that supports stdio transport. Example client snippets:
 
-Add to `.claude/mcp.json` (project) or `~/.claude/mcp.json` (global):
-
-```json
-{
-  "servers": {
-    "adhd-developer": {
-      "type": "stdio",
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "imaandrw/mcp-app:latest"]
-    }
-  }
-}
-```
-
-#### VS Code (Copilot / MCP extension)
-
-Add to `.vscode/mcp.json`:
+Claude Code (`.claude/mcp.json`):
 
 ```json
 {
@@ -57,9 +35,21 @@ Add to `.vscode/mcp.json`:
 }
 ```
 
-#### Cursor
+VS Code (`.vscode/mcp.json`):
 
-Add to `.cursor/mcp.json`:
+```json
+{
+  "servers": {
+    "adhd-developer": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "imaandrw/mcp-app:latest"]
+    }
+  }
+}
+```
+
+Cursor (`.cursor/mcp.json`):
 
 ```json
 {
@@ -72,9 +62,7 @@ Add to `.cursor/mcp.json`:
 }
 ```
 
-#### Windsurf / Codeium
-
-Add to `.windsurf/mcp.json`:
+Windsurf / Codeium (`.windsurf/mcp.json`):
 
 ```json
 {
@@ -87,35 +75,26 @@ Add to `.windsurf/mcp.json`:
 }
 ```
 
----
+Installation helpers (npx)
 
-## Installation (npx)
+Project-level automated setup configures supported clients and places minimal config files in the project:
 
-### Project-Level (Automated)
-If you are inside a project and using an agent that supports the `mcp_enable` (or legacy `setup_project`) tool:
-1. Run `npx -y adhdeveloper enable`
-This will automatically configure:
-- **Claude Code** (`.mcp.json`)
-- **Cursor** (`.cursor/mcp.json`)
-- **VS Code Copilot** (`.vscode/mcp.json`)
-- **Gemini CLI** (`.gemini/settings.json`)
-- **OpenAI Codex** (`.codex/config.toml`)
-- **Junie** (`.junie/mcp/mcp.json`)
-- **GitHub Copilot CLI** (Global `~/.copilot/mcp-config.json`)
+```bash
+npx -y adhdeveloper enable
+# To remove
+npx -y adhdeveloper disable
+```
 
-To remove the integration:
-- Run `npx -y adhdeveloper disable`
+User-level manual configuration
 
----
+If you prefer manual setup, add an entry to your client configuration as shown above. Example: adding an `npx` launcher entry for Claude Desktop.
 
-### User-Level (Manual Configuration)
+Claude Desktop configuration file locations:
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
 
-#### 1. Claude Desktop
-Add to `claude_desktop_config.json`:
-
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+Example config for Claude Desktop (call `npx -y adhdeveloper`):
 
 ```json
 {
@@ -128,105 +107,58 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
-#### 2. Cursor (IDE Settings)
-Go to **Settings > Cursor Settings > Features > MCP Servers** and add:
-- **Name:** `adhd-developer`
-- **Type:** `command`
-- **Command:** `npx -y adhdeveloper`
+Cursor (IDE settings):
+- Settings > Cursor Settings > Features > MCP Servers: add `adhd-developer` (command: `npx -y adhdeveloper`).
 
-#### 3. JetBrains (IntelliJ, WebStorm, etc.)
-Install the `intelliJPlugin` located in this repository or use **Junie** plugin with the project-level config.
+JetBrains IDEs (IntelliJ, WebStorm, etc.):
+- Install the `intelliJPlugin` from this repository or configure a compatible plugin such as Junie.
 
----
+Usage overview
 
-## Usage
+The server exposes a set of tools and named agents. Key features:
 
-Once installed, your AI agent will have access to specialized "ADHD-friendly" tools:
+- MCP management: `mcp_enable`, `mcp_disable` (add/remove project integration files for supported clients).
+- Planning / Orchestration: `orchestrate`, `planner` — break goals into manageable steps and generate `plan.md`.
+- Execution: `execute_agent` — run specific agents (`planner`, `documenter`, `securityAuditor`, etc.).
+- Focus helpers: `focus-timer` — Pomodoro-style focus sessions.
+- Security: `securityAuditor` — SAST, dependency audits, and secrets detection.
+- Sandbox: `sandbox_execute` — run JS/TS/Python/Bash safely in an isolated environment.
 
-### MCP Management
-- `mcp_enable`: Enable adhd-developer MCP configuration in supported clients.
-- `mcp_disable`: Disable adhd-developer MCP configuration in supported clients.
-- `setup_project`: Backward-compatible alias of `mcp_enable`.
+Flow & multi-agent execution
 
-### Focus & Planning
-- `orchestrate`: Best for starting a task. The orchestrator breaks down goals into manageable steps.
-- `execute_agent`: Run specific sub-agents:
-  - `planner`: Creates structured `plan.md`.
-  - `focus-timer`: Sets up pomodoro/focus sessions.
-  - `mood-detector`: Adjusts response tone based on your current state.
+`execute_agent` supports explicit multi-agent flows and an automatic explainer when flows close. Flows let you group several agent calls under a single `flowId` so that the system can produce a consolidated explanation at the end.
 
-#### `execute_agent` Flow Mode (Auto-Explainer at Flow Close)
+Flow metadata (example fields inside `metadata`):
+- `flowId?: string` — Optional identifier to group calls.
+- `flowCompleted?: boolean` — Set to `true` on the final step to trigger the explainer summary.
 
-`execute_agent` now supports explicit and implicit multi-agent flows.  
-When a flow closes, `explainer` runs automatically and its summary is appended inline in the same response.
+Flow rules (summary):
+- Calls with the same `flowId` accumulate into the same flow.
+- Setting `flowCompleted: true` triggers the explainer and closes the flow.
+- Omitted `flowId` values create implicit single-call flows that close immediately.
+- The explainer runs only once per closed flow and is not triggered by direct calls to the `explainer` agent.
 
-Flow metadata (inside `metadata`):
-- `flowId?: string`: Optional flow identifier to group multiple `execute_agent` calls.
-- `flowCompleted?: boolean`: Marks current flow as finished and triggers final summary.
-
-Flow rules:
-- If `flowId` is present, calls accumulate into that flow until a call sets `flowCompleted: true`.
-- If `flowId` is omitted, the call is treated as an implicit single-step flow and closes automatically.
-- Auto-explainer only triggers at flow close, and only when executed agent is not `explainer`.
-- Chat turn boundaries alone do not trigger explainer; only `execute_agent` does.
-
-Summary content at close:
-- Includes all agents executed before explainer, in execution order.
-- Includes both successful and failed steps.
-- Generates approximately two lines per participant agent.
-- Returned inline in `message` after the final agent result under an `Explainer:` block.
-
-Structured response payload:
-- `data.flow.flowId`: Closed flow identifier.
-- `data.flow.completed`: Always `true` when close happens.
-- `data.flow.implicit`: Whether flow was implicit single-call fallback.
-- `data.flow.participants`: Ordered participant list.
-- `data.flow.steps`: Per-step records (`agentName`, `success`, `messageExcerpt`).
-- `data.flow.explainer`: Raw `explainer` agent result.
+Explainer summary output (at flow close) contains:
+- Ordered participant list and per-step excerpts.
+- A short human-friendly summary appended to the final agent response under an `Explainer:` block.
 
 Example: explicit multi-agent flow
 
 ```json
-{
-  "agentName": "planner",
-  "query": "Plan backend refactor",
-  "metadata": { "flowId": "flow-123" }
-}
+{ "agentName": "planner", "query": "Plan backend refactor", "metadata": { "flowId": "flow-123" } }
 ```
 
 ```json
-{
-  "agentName": "documenter",
-  "query": "Document README.md changes",
-  "metadata": {
-    "flowId": "flow-123",
-    "flowCompleted": true,
-    "filePath": "README.md",
-    "mode": "summary"
-  }
-}
+{ "agentName": "documenter", "query": "Document README changes", "metadata": { "flowId": "flow-123", "flowCompleted": true } }
 ```
 
-Example: implicit single-call flow (auto-close)
+Flow monitoring (IDE integrations)
 
-```json
-{
-  "agentName": "planner",
-  "query": "Create a quick test strategy"
-}
-```
+- `flow_state`: Snapshot of active flows, participants, and step history.
+- `flow_get`: Inspect a specific flow by ID.
 
-Notes:
-- Direct calls to `agentName: "explainer"` keep normal behavior and do not chain another explainer.
-- Flow state is in-memory only and has TTL cleanup for orphaned flows.
+Sample `flow_state` response:
 
-### Flow Monitoring (IDE Plugin Integration)
-- `flow_state`: Get snapshot of all active flows, agents running, step history, and timestamps.
-- `flow_get`: Inspect a specific flow by ID (useful for real-time status updates in IDEs).
-
-#### Monitoring Response Format
-
-`flow_state` returns:
 ```json
 {
   "activeFlows": 2,
@@ -248,10 +180,8 @@ Notes:
 }
 ```
 
-`flow_get` with valid flowId returns same structure as single flow object.  
-`flow_get` with expired/invalid flowId returns `{ "error": "Flow not found or expired" }`.
+IntelliJ Plugin integration example (Kotlin):
 
-**IntelliJ Plugin Usage:**
 ```kotlin
 // MCPBridgeService.kt
 fun getActiveFlows(): FlowStateResponse {
@@ -261,32 +191,19 @@ fun getActiveFlows(): FlowStateResponse {
 fun getFlowDetails(flowId: String): FlowMetadata? {
     return mcp.call("flow_get", mapOf("flowId" to flowId))
 }
-
-// Render in AgentStage ToolWindow:
-// - Show active agents per flow
-// - Track execution timeline (createdAt → updatedAt)
-// - Display step history with success/failure status
 ```
 
-### Security & Code Quality
-- `securityAuditor`: Comprehensive security scanning across all languages. Detects SAST vulnerabilities, dependency issues, hardcoded secrets, and configuration problems. Reports with severity levels and suggested fixes.
+Security & code quality
 
-### Codebase Mastery
-- `repo_bootstrap`: Scaffolds new projects with best practices.
-- `explain_subdirectories`: Generates architectural summaries of your folders.
-- `smoke_tester`: Runs quick checks to ensure nothing is broken.
+- `securityAuditor`: Comprehensive security scanning across languages. Detects SAST issues, dependency vulnerabilities, hardcoded secrets, and configuration problems. Produces prioritized reports with suggested fixes.
 
-## Security Auditor Agent
+Security auditor capabilities:
+- Static code analysis (SAST) for common classes of bugs and insecure patterns.
+- Dependency audits for npm, pip, Maven/Gradle, and Go modules.
+- Secrets detection (API keys, tokens, private keys).
+- Configuration checks (exposed files, CORS, insecure headers).
 
-The `securityAuditor` performs comprehensive vulnerability scanning:
-
-### Capabilities
-- **Static Code Analysis (SAST)**: Detects injection attacks, XSS, weak crypto, eval usage, insecure randomness across all languages
-- **Dependency Audits**: Checks npm, Python pip, Maven, Gradle, and Go module vulnerabilities
-- **Secrets Detection**: Finds hardcoded credentials, API keys, AWS keys, JWT tokens, private keys
-- **Configuration Audit**: Scans for exposed sensitive files, bad permissions, CORS misconfigurations, missing security headers
-
-### Usage Example
+Security auditor usage example:
 
 ```json
 {
@@ -296,15 +213,13 @@ The `securityAuditor` performs comprehensive vulnerability scanning:
 }
 ```
 
-### Response Format
+Response format (Markdown report):
+- Summary statistics (counts by severity and type).
+- Detailed findings grouped by vulnerability type.
+- Each finding includes: title, severity, file/line, description, suggested fix, and CVE (if applicable).
 
-The agent returns a Markdown report with:
-- Summary statistics (total vulnerabilities, by severity and type)
-- Detailed findings grouped by vulnerability type
-- Each finding includes: title, severity, file/line, description, suggested fix, and CVE ID (if applicable)
-- Actionable recommendations prioritized by severity
+Example finding:
 
-Example vulnerability entry in report:
 ```
 #### ⚠️ SQL Injection Risk `CRITICAL`
 
@@ -317,60 +232,36 @@ Example vulnerability entry in report:
 **Suggested Fix**: Use parameterized queries: `db.query('SELECT * FROM users WHERE id = ?', [userId])`
 ```
 
-### Example Workflow
-1. **User:** "I need to build a login page."
-2. **Agent:** Uses `orchestrate` to plan.
-3. **Agent:** Uses `planner` to write `plan.md`.
-4. **Agent:** Uses `focus-timer` to start a 25-minute sprint.
-5. **Agent:** Implements code.
-6. **Agent:** Uses `securityAuditor` to scan for vulnerabilities.
-7. **Agent:** Uses `smoke_tester` to verify.
-
-## Tools Reference
+Tools and agents reference (short)
 
 | Tool | Description |
 |------|-------------|
 | `orchestrate` | Route a task to the best-fit agent |
 | `execute_agent` | Run a specific agent by name |
 | `list_agents` | List all registered agents and capabilities |
-| `sandbox_execute` | Run code in an isolated sandbox (JS, TS, Python, Bash) |
+| `sandbox_execute` | Run code in an isolated sandbox (JS/TS/Python/Bash) |
 | `load_balance` | Plan parallel/sequential execution for multi-agent workflows |
 | `benchmark_versions` | Compare agent versions across multiple runs |
 | `repo_bootstrap` | Scaffold a new repo from structured requirements |
 | `explain_subdirectories` | Generate per-directory architecture docs |
 | `test_playbook` | Analyze and document the project test structure |
-| `read_file_cached` | Read files with in-session cache to avoid redundant I/O |
-| `cache_info` / `cache_invalidate` / `cache_clear` | Manage the context cache |
-| `mcp_enable` / `mcp_disable` | Add or remove MCP config from a project |
-| `flow_state` / `flow_get` | Inspect active multi-agent flow state |
 
-## Agents Reference
+Agents (examples):
+- `planner`, `documenter`, `securityAuditor`, `focus-timer`, `smoke-tester`, `debugger`, `git-maintainer`, `code-reviewer`, `explainer`, `mood`, `database-expert`, `repo-initializer`, `docker`, `kubernetes`.
 
-| Agent | Role |
-|-------|------|
-| `debugger` | Root-cause analysis and fix suggestions |
-| `smoke-tester` | Quick sanity checks on code or endpoints |
-| `security-auditor` | Static analysis, secrets scanning, dependency audit |
-| `git-maintainer` | PR analysis, merge strategy, conflict resolution |
-| `code-reviewer` | Code quality and best-practice review |
-| `planner` | Break tasks into structured execution plans |
-| `focus-timer` | ADHD-friendly time-boxing and focus sessions |
-| `mood` | Developer mood tracking and encouragement |
-| `documenter` | Generate and update project documentation |
-| `explainer` | Plain-language code and concept explanations |
-| `database-expert` | Query optimization and schema advice |
-| `repo-initializer` | Bootstrap new projects |
-| `cicd` | CI/CD pipeline guidance |
-| `docker` | Dockerfile and Compose advice |
-| `kubernetes` | K8s manifest and deployment help |
-| `claude` | General-purpose Claude agent |
+Development (local)
 
----
+To run the server locally for development:
 
-## Development
+```bash
+cd mcpServer
+npm install
+npm run build
+node dist/index.js
+```
 
-1. `npm install`
-2. `npm run build`
-3. `npm start` (Stdio transport)
+Requirements: Node.js >= 22
 
-License: MIT
+License
+
+MIT
