@@ -14,6 +14,7 @@ import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } f
 import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } from "./tools/contextCache.js";
 import { runBenchmark } from "./tools/benchmark.js";
 import { executeSandbox } from "./tools/sandbox.js";
+import { planExecution } from "./tools/loadBalancer.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -390,6 +391,71 @@ async function main() {
       const result = await executeSandbox(params);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "load_balance",
+    "Plan optimal execution order and parallelism for a set of agent tasks. " +
+    "Analyzes dependencies, estimated cost (tokens), estimated time, failure risk, and result impact to produce a structured execution plan. " +
+    "Returns ordered phases with parallelism decisions, critical path, time savings, and warnings. " +
+    "Rules: never parallelize dependent tasks; parallelize independent tasks when time savings are significant; " +
+    "run critical+high-risk tasks sequentially; minimize cost when time impact is low; " +
+    "minimize time when tasks are independent and expensive; avoid pointless parallelism. " +
+    "Use before orchestrating multi-agent workflows to minimize time and cost.",
+    {
+      tasks: z
+        .array(
+          z.object({
+            id: z.string().describe("Unique task identifier"),
+            agentName: z.string().describe("Agent to execute this task"),
+            query: z.string().describe("Query or instruction for the agent"),
+            dependencies: z
+              .array(z.string())
+              .optional()
+              .describe("IDs of tasks that must complete before this one starts"),
+            estimatedCostTokens: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .describe("Estimated token cost (default 500)"),
+            estimatedTimeMs: z
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .describe("Estimated execution time in ms (default 2000)"),
+            failureRisk: z
+              .number()
+              .min(0)
+              .max(1)
+              .optional()
+              .describe("Probability of failure 0–1 (default 0.1)"),
+            resultImpact: z
+              .number()
+              .min(0)
+              .max(1)
+              .optional()
+              .describe("How much this task affects the final result 0–1 (default 0.5)"),
+            critical: z
+              .boolean()
+              .optional()
+              .describe("If true, this task is on the critical path — sequential treatment when risk is high (default false)"),
+            metadata: z
+              .record(z.unknown())
+              .optional()
+              .describe("Optional metadata passed through to the agent"),
+          })
+        )
+        .min(1)
+        .describe("Tasks to schedule"),
+    },
+    async ({ tasks }) => {
+      const plan = planExecution(tasks);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(plan, null, 2) }],
       };
     }
   );
