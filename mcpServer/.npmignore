@@ -1,0 +1,6 @@
+src/
+tsconfig.json
+Dockerfile
+.gitignore
+package-lock.json
+.dockerignore

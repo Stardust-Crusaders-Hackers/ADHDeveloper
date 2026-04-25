@@ -1,12 +1,17 @@
 {
-  "name": "mcp-server",
-  "version": "0.1.0",
-  "description": "MCP server (TypeScript + Node)",
+  "name": "adhdeveloper",
+  "version": "0.2.0",
+  "description": "MCP server for ADHD-friendly development assistance",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "adhdeveloper": "dist/index.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
@@ -18,7 +23,7 @@
     "dev": "tsx src/index.ts"
   },
   "license": "MIT",
-  "author": "ADHDeveloper",
+  "author": "Stardust-Crusaders-Hackers (https://github.com/Stardust-Crusaders-Hackers)",
   "contributors": [
     {
       "name": "Andreea Cerchia"

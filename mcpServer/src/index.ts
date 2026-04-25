@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -6,6 +7,8 @@ import { fileURLToPath } from "url";
 import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { setupProject } from "./tools/setupProject.js";
+import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
+import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
 import { readFile, getCacheInfo, invalidate, clearCache } from "./tools/contextCache.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -74,6 +77,75 @@ async function main() {
     },
     async ({ projectPath }) => {
       const result = await setupProject(projectPath);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  // Plugin bridge tools — used by IntelliJ MCPBridgeService
+  server.tool("agents/list", "List agents registered via plugin bridge", {}, async () => ({
+    content: [{ type: "text" as const, text: JSON.stringify({ agents: listAgents() }) }]
+  }));
+
+  server.tool("tasks/active", "List active tasks from plugin bridge", {}, async () => ({
+    content: [{ type: "text" as const, text: JSON.stringify({ tasks: listActiveTasks() }) }]
+  }));
+
+  server.tool("agent/register", "Register an agent in the plugin bridge", {
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    description: z.string().optional(),
+  }, async (params) => {
+    const agent = registerAgent({ ...params, description: params.description ?? "" });
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, agent }) }] };
+  });
+
+  server.tool("task/start", "Start a task in the plugin bridge", {
+    taskId: z.string(),
+    agentId: z.string(),
+    description: z.string(),
+  }, async (params) => {
+    const task = startTask(params);
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, task }) }] };
+  });
+
+  server.tool("task/complete", "Complete a task in the plugin bridge", {
+    taskId: z.string(),
+    agentId: z.string(),
+    result: z.string().optional(),
+  }, async ({ taskId, agentId, result }) => {
+    const task = completeTask(taskId, agentId, result ?? "");
+    return { content: [{ type: "text" as const, text: JSON.stringify({ ok: true, task }) }] };
+  });
+
+  server.tool(
+    "repo_bootstrap",
+    "Initialize repository/project scaffold from structured requirements. Supports multi-stack templates, architecture skeletons, Docker and optional Nginx setup, with safe conflict policy.",
+    {
+      projectPath: z.string().describe("Absolute path to target project root"),
+      config: z.object({
+        projectName: z.string().describe("Project/repository name"),
+        vision: z.string().optional().describe("Short project vision"),
+        stacks: z.array(z.string()).min(1).describe("Stacks/languages to bootstrap"),
+        architecture: z.enum(["monolith", "modular", "hexagonal", "microservices"]).describe("Desired architecture"),
+        dockerize: z.boolean().describe("Whether to include Docker artifacts"),
+        includeNginx: z.boolean().describe("Whether to include Nginx base config"),
+        overwritePolicy: z.enum(["no-overwrite", "overwrite", "prompt"]).optional().describe("Conflict policy for existing files"),
+      }),
+    },
+    async ({ projectPath, config }) => {
+      const bootstrapConfig: RepoBootstrapConfig = {
+        projectName: config.projectName,
+        vision: config.vision,
+        stacks: config.stacks,
+        architecture: config.architecture,
+        dockerize: config.dockerize,
+        includeNginx: config.includeNginx,
+        overwritePolicy: config.overwritePolicy,
+      };
+      const result = await repoBootstrap(projectPath, bootstrapConfig);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
