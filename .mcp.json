@@ -8,6 +8,12 @@
         "-y",
         "hackathon-mode@latest"
       ]
+    },
+    "adhd-developer": {
+      "command": "node",
+      "args": [
+        "mcpServer/dist/index.js"
+      ]
     }
   }
 }
