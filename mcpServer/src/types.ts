@@ -51,3 +51,19 @@ export interface OrchestrationResult {
   recommendations: AgentRecommendation[];
   allAgents?: AgentSummary[];
 }
+
+export interface FlowStateResponse {
+  activeFlows: number;
+  flows: FlowMetadata[];
+  timestamp: number;
+}
+
+export interface FlowMetadata {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  ageMs: number;
+  participants: string[];
+  stepsCount: number;
+  steps: FlowStepSummary[];
+}

@@ -264,4 +264,35 @@ export class Orchestrator {
     if (compact.length <= maxLength) return compact;
     return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
   }
+
+  // Monitoring API — for plugin inspection
+  getFlowState() {
+    const flows = Array.from(this.flowState.entries()).map(([id, flow]) => ({
+      id: flow.id,
+      createdAt: flow.createdAt,
+      updatedAt: flow.updatedAt,
+      ageMs: Date.now() - flow.createdAt,
+      stepsCount: flow.steps.length,
+      participants: this.collectParticipants(flow.steps),
+      steps: flow.steps,
+    }));
+    return {
+      activeFlows: flows.length,
+      flows,
+      timestamp: Date.now(),
+    };
+  }
+
+  getFlowById(flowId: string) {
+    const flow = this.flowState.get(flowId);
+    if (!flow) return null;
+    return {
+      id: flow.id,
+      createdAt: flow.createdAt,
+      updatedAt: flow.updatedAt,
+      ageMs: Date.now() - flow.createdAt,
+      participants: this.collectParticipants(flow.steps),
+      steps: flow.steps,
+    };
+  }
 }
