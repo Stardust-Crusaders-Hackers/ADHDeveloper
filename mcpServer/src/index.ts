@@ -184,8 +184,13 @@ async function main() {
       const meta = result.source === "cache"
         ? `[CACHE HIT — hit #${result.hits}, ${result.sizeBytes} bytes, no disk read]`
         : `[DISK READ — cached for future calls, ${result.sizeBytes} bytes]`;
+      const contentBlock = {
+        type: "text" as const,
+        text: `${meta}\n\n${result.content}`,
+        ...(result.cacheControl ? { cache_control: result.cacheControl } : {}),
+      };
       return {
-        content: [{ type: "text" as const, text: `${meta}\n\n${result.content}` }],
+        content: [contentBlock as any],
       };
     }
   );
