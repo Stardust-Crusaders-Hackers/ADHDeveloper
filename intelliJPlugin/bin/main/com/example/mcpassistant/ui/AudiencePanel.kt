@@ -16,7 +16,7 @@ class AudiencePanel : JBPanel<AudiencePanel>() {
     init {
         layout = FlowLayout(FlowLayout.CENTER, 10, 10)
         preferredSize = Dimension(COLS * SEAT_W, ROWS * SEAT_H)
-        minimumSize = Dimension(200, SEAT_H)
+        minimumSize = Dimension(COLS * SEAT_W, SEAT_H)
         background = Color(15, 15, 35)
     }
 

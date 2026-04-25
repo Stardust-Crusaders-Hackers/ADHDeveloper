@@ -8,7 +8,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBPanel
 import java.awt.*
-import java.awt.event.HierarchyEvent
 import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
 import javax.swing.*
@@ -41,12 +40,6 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
             border = null
             dividerSize = 4
             background = Color(10, 10, 25)
-            // Set initial divider once the pane has a real size
-            addHierarchyListener { e ->
-                if (e.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L && isShowing) {
-                    SwingUtilities.invokeLater { setDividerLocation(0.65) }
-                }
-            }
         }
 
         add(splitPane, BorderLayout.CENTER)
@@ -54,7 +47,7 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     }
 
     fun syncExistingAgents() {
-        project.service<com.example.mcpassistant.services.AgentRegistryService>().getAgents().forEach { state ->
+        service<com.example.mcpassistant.services.AgentRegistryService>().getAgents().forEach { state ->
             registerAvatar(state.agent)
         }
     }

@@ -53,8 +53,7 @@ class StageSettingsConfigurable : Configurable {
     private fun restartBridge() {
         com.intellij.openapi.project.ProjectManager.getInstance().openProjects.forEach { project ->
             ApplicationManager.getApplication().executeOnPooledThread {
-                val mcpDir = com.example.mcpassistant.plugin.McpInstallStartupActivity().resolveMcpDir(project)
-                project.service<com.example.mcpassistant.services.MCPBridgeService>().startWithFallback(mcpDir)
+                project.service<com.example.mcpassistant.services.MCPBridgeService>().start()
             }
         }
     }

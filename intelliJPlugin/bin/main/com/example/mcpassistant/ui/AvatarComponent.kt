@@ -36,10 +36,9 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     override fun paintComponent(g: Graphics) {
         val g2d = g as Graphics2D
         
-        // Diagnostic: Fill background to verify component bounds and paint invocation
-        g2d.color = Color(255, 0, 0, 50)
-        g2d.fillRect(0, 0, width, height)
-        System.err.println("[ADHD] paintComponent called for ${agent.name}, size=${width}x${height}, alpha=$alpha")
+        // Diagnostic: Fill background with semi-transparent color to see component bounds
+        // g2d.color = Color(255, 0, 0, 50)
+        // g2d.fillRect(0, 0, width, height)
 
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
