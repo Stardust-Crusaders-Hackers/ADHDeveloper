@@ -74,7 +74,14 @@ async function main() {
     {
       agentName: z.string().describe("The name of the agent to execute"),
       query: z.string().describe("The task or query for the agent"),
-      metadata: z.record(z.unknown()).optional().describe("Optional additional context"),
+      metadata: z
+        .object({
+          flowId: z.string().optional().describe("Optional flow identifier to group multi-agent executions"),
+          flowCompleted: z.boolean().optional().describe("Marks the current flow as completed and triggers the final explainer"),
+        })
+        .catchall(z.unknown())
+        .optional()
+        .describe("Optional additional context"),
     },
     async ({ agentName, query, metadata }) => {
       const result = await orchestrator.executeAgent(agentName, { query, metadata });

@@ -1,6 +1,11 @@
 import { AgentContext, AgentDefinition, AgentResult } from "../types.js";
 
 type Lang = "es" | "en";
+type FlowStepInput = {
+  agentName: string;
+  success: boolean;
+  messageExcerpt: string;
+};
 
 function detectLanguage(input: string): Lang {
   const lowered = input.toLowerCase();
@@ -46,6 +51,84 @@ function twoSentences(first: string, second: string): string {
   const a = first.trim().replace(/[.!?]+$/g, "");
   const b = second.trim().replace(/[.!?]+$/g, "");
   return `${a}. ${b}.`;
+}
+
+function parseFlowSteps(metadata: Record<string, unknown> | undefined): FlowStepInput[] {
+  if (!metadata || !Array.isArray(metadata.flowSteps)) return [];
+  return metadata.flowSteps
+    .map((raw): FlowStepInput | null => {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as Record<string, unknown>;
+      const agentName = typeof row.agentName === "string" ? row.agentName.trim() : "";
+      if (!agentName) return null;
+      return {
+        agentName,
+        success: row.success !== false,
+        messageExcerpt: sanitizeSnippet(row.messageExcerpt, 180),
+      };
+    })
+    .filter((row): row is FlowStepInput => row !== null);
+}
+
+function parseFlowParticipants(metadata: Record<string, unknown> | undefined, steps: FlowStepInput[]): string[] {
+  if (metadata && Array.isArray(metadata.flowParticipants)) {
+    const normalized = metadata.flowParticipants
+      .map((name) => (typeof name === "string" ? name.trim() : ""))
+      .filter(Boolean);
+    if (normalized.length > 0) return normalized;
+  }
+
+  const seen = new Set<string>();
+  const participants: string[] = [];
+  for (const step of steps) {
+    if (seen.has(step.agentName)) continue;
+    seen.add(step.agentName);
+    participants.push(step.agentName);
+  }
+  return participants;
+}
+
+function toFlowSummaryLine(lang: Lang, agentName: string, steps: FlowStepInput[]): [string, string] {
+  const total = steps.length;
+  const failed = steps.filter((step) => !step.success).length;
+  const latest = steps[steps.length - 1];
+  const excerpt = latest?.messageExcerpt || (lang === "en" ? "No output details were captured" : "No se capturaron detalles de salida");
+  const health = failed === 0
+    ? (lang === "en" ? "completed without failures" : "terminó sin fallos")
+    : (lang === "en" ? `${failed} failed step(s)` : `${failed} paso(s) fallido(s)`);
+
+  if (lang === "en") {
+    return [
+      `${agentName}: ${total} step(s), ${health}.`,
+      `${agentName} output: ${excerpt}.`,
+    ];
+  }
+
+  return [
+    `${agentName}: ${total} paso(s), ${health}.`,
+    `Salida de ${agentName}: ${excerpt}.`,
+  ];
+}
+
+function buildFlowSummary(lang: Lang, participants: string[], steps: FlowStepInput[]): string {
+  const header = lang === "en" ? "Final flow summary by agent:" : "Resumen final del flujo por agente:";
+  const blocks: string[] = [header];
+
+  for (const participant of participants) {
+    const agentSteps = steps.filter((step) => step.agentName === participant);
+    const [line1, line2] = toFlowSummaryLine(lang, participant, agentSteps);
+    blocks.push(`${line1}\n${line2}`);
+  }
+
+  if (participants.length === 0) {
+    blocks.push(
+      lang === "en"
+        ? "No prior agents were recorded before explainer."
+        : "No se registraron agentes previos antes de explainer."
+    );
+  }
+
+  return blocks.join("\n\n");
 }
 
 function buildSpanish(agentWork: string, codeWork: string, queryFallback: string): string {
@@ -94,6 +177,8 @@ function buildEnglish(agentWork: string, codeWork: string, queryFallback: string
 
 async function handler(ctx: AgentContext): Promise<AgentResult> {
   const metadata = ctx.metadata as Record<string, unknown> | undefined;
+  const flowSteps = parseFlowSteps(metadata);
+  const flowParticipants = parseFlowParticipants(metadata, flowSteps);
 
   const agentWork = pickFirstText(metadata, [
     "agentWork",
@@ -112,7 +197,21 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
   ]);
 
   const queryFallback = sanitizeSnippet(ctx.query, 120);
-  const lang = detectLanguage(`${ctx.query} ${agentWork} ${codeWork}`);
+  const lang = detectLanguage(`${ctx.query} ${agentWork} ${codeWork} ${flowParticipants.join(" ")}`);
+
+  if (flowSteps.length > 0 || flowParticipants.length > 0) {
+    const message = buildFlowSummary(lang, flowParticipants, flowSteps);
+    return {
+      success: true,
+      message,
+      data: {
+        language: lang,
+        format: "flow-summary",
+        participants: flowParticipants,
+        stepsCount: flowSteps.length,
+      },
+    };
+  }
 
   const message = lang === "en"
     ? buildEnglish(agentWork, codeWork, queryFallback)
@@ -137,7 +236,7 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
 const explainerAgent: AgentDefinition = {
   name: "explainer",
   description:
-    "Explica actividad de agentes o código completado en sesión en exactamente dos frases con cierre humorístico breve.",
+    "Resume flujos de trabajo multi-agente por participante y mantiene modo de dos frases cuando no hay contexto de flujo.",
   keywords: [
     "explain",
     "explainer",
