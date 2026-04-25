@@ -12,6 +12,8 @@ import { explainSubdirectories } from "./tools/explainSubdirectories.js";
 import { ensureTestPlaybook } from "./tools/testPlaybook.js";
 import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
 import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } from "./tools/contextCache.js";
+import { runBenchmark } from "./tools/benchmark.js";
+import { executeSandbox } from "./tools/sandbox.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -334,6 +336,107 @@ async function main() {
       };
     }
   );
+
+
+
+  server.tool(
+    "sandbox_execute",
+    "Execute code in an isolated sandbox before using it in production. " +
+    "Supports JavaScript, TypeScript, Python, Bash, and sh. " +
+    "Uses Docker (preferred) for full isolation: memory cap, CPU throttle, read-only filesystem, no network, dropped capabilities. " +
+    "Falls back to Node vm module (JS only, timeout-only) or bare process when Docker is unavailable — engine and any isolation gaps are reported in the result. " +
+    "Use for: running agent-generated code safely, validating scripts before deployment, executing dynamic tests.",
+    {
+      code: z.string().describe("Source code to execute"),
+      language: z
+        .enum(["javascript", "typescript", "python", "bash", "sh"])
+        .describe("Language of the code"),
+      stdin: z.string().optional().describe("Optional stdin to pipe into the process"),
+      args: z
+        .array(z.string())
+        .optional()
+        .describe("Optional command-line arguments passed to the script"),
+      limits: z
+        .object({
+          timeoutMs: z
+            .number()
+            .int()
+            .min(100)
+            .max(120_000)
+            .optional()
+            .describe("Max execution time in ms (default 10000)"),
+          memoryMb: z
+            .number()
+            .int()
+            .min(16)
+            .max(2048)
+            .optional()
+            .describe("Memory limit in MB (default 128, Docker only)"),
+          cpus: z
+            .number()
+            .min(0.1)
+            .max(4)
+            .optional()
+            .describe("CPU share limit (default 0.5, Docker only)"),
+          networkAccess: z
+            .boolean()
+            .optional()
+            .describe("Allow outbound network from sandbox (default false, Docker only)"),
+        })
+        .optional()
+        .describe("Resource limits — memory/CPU/network only enforced in Docker engine"),
+    },
+    async (params) => {
+      const result = await executeSandbox(params);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "benchmark_versions",
+    "Benchmark and compare agent versions across multiple runs. Measures execution time (avg/p50/p95), memory delta, output length, token estimate, consistency across runs, keyword hit rate, and similarity to expected output. First version is the baseline; all others are diffed against it. Returns percentage deltas and human-readable verdicts like 'v2 is 23% slower but 10% more accurate'.",
+    {
+      name: z.string().describe("Benchmark name"),
+      versions: z
+        .array(
+          z.object({
+            id: z.string().describe("Version identifier (e.g. 'v1', 'baseline', 'fast')"),
+            agentName: z.string().describe("Agent name to execute"),
+            query: z.string().describe("Query to send to the agent"),
+            metadata: z.record(z.unknown()).optional().describe("Optional agent metadata"),
+          })
+        )
+        .min(1)
+        .describe("Versions to benchmark. First entry is the baseline for diffs."),
+      runs: z.number().int().min(1).max(50).default(5).describe("Measured runs per version"),
+      warmupRuns: z
+        .number()
+        .int()
+        .min(0)
+        .max(10)
+        .default(1)
+        .describe("Warmup runs discarded before measuring"),
+      qualityKeywords: z
+        .array(z.string())
+        .optional()
+        .describe("Keywords to look for in outputs — used for quality/accuracy scoring"),
+      expectedOutput: z
+        .string()
+        .optional()
+        .describe("Expected output text — Jaccard similarity used as quality score"),
+    },
+    async ({ name, versions, runs, warmupRuns, qualityKeywords, expectedOutput }) => {
+      const report = await runBenchmark(
+        (agentName, ctx) => orchestrator.executeAgent(agentName, ctx),
+        { name, versions, runs, warmupRuns, qualityKeywords, expectedOutput }
+      );
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(report, null, 2) }],
+      };
+    }
+  );  
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
