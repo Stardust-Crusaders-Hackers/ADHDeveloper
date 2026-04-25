@@ -12,19 +12,19 @@ type Answers = {
 };
 
 const DISCOVERY_QUESTIONS = [
-  "¿Nombre del proyecto/repositorio?",
-  "¿Cuál es la visión del proyecto (1-2 frases)?",
-  "¿Qué stack(s) quieres usar? (Node, Python, Java, Go, Kotlin, PHP, Ruby, Rust, C, C++, .NET Core...)",
-  "¿Arquitectura deseada? (monolith, modular, hexagonal, microservices)",
-  "¿Dockerizar desde el inicio? (sí/no)",
-  "¿Incluir configuración base de Nginx/reverse proxy? (sí/no)",
-  "¿Agregar base de CI/CD? (sí/no)",
-  "¿Política de conflictos? (no-overwrite, overwrite, prompt)",
+  "Project/Repository name?",
+  "What is the project vision (1-2 sentences)?",
+  "Which stack(s) do you want to use? (Node, Python, Java, Go, Kotlin, PHP, Ruby, Rust, C, C++, .NET Core...)",
+  "Desired architecture? (monolith, modular, hexagonal, microservices)",
+  "Dockerize from the start? (yes/no)",
+  "Include base Nginx/reverse proxy config? (yes/no)",
+  "Add CI/CD base? (yes/no)",
+  "Conflict policy? (no-overwrite, overwrite, prompt)",
 ];
 
 const repoInitializerAgent: AgentDefinition = {
   name: "repo-initializer",
-  description: "Inicializa repos/proyectos con discovery guiado de requisitos y bootstrap técnico multi-stack.",
+  description: "Initializes repos/projects with guided requirement discovery and multi-stack technical bootstrap.",
   keywords: [
     "init",
     "initialize",
@@ -54,9 +54,9 @@ const repoInitializerAgent: AgentDefinition = {
       return {
         success: true,
         message:
-          `Falta información para bootstrap real. Campos faltantes: ${missing.join(", ")}.\n\n` +
-          `Preguntas discovery recomendadas:\n- ${DISCOVERY_QUESTIONS.join("\n- ")}\n\n` +
-          "Cuando tengas respuestas, ejecuta tool `repo_bootstrap` con projectPath absoluto y config completo.",
+          `Missing information for real bootstrap. Missing fields: ${missing.join(", ")}.\n\n` +
+          `Recommended discovery questions:\n- ${DISCOVERY_QUESTIONS.join("\n- ")}\n\n` +
+          "Once you have answers, execute tool `repo_bootstrap` with absolute projectPath and complete config.",
         data: {
           requiredFields: missing,
           discoveryQuestions: DISCOVERY_QUESTIONS,
@@ -68,8 +68,8 @@ const repoInitializerAgent: AgentDefinition = {
     return {
       success: true,
       message:
-        "Discovery completo. Listo para bootstrap real.\n" +
-        "Siguiente paso: ejecutar `repo_bootstrap` con este config y projectPath absoluto.",
+        "Discovery complete. Ready for real bootstrap.\n" +
+        "Next step: execute `repo_bootstrap` with this config and absolute projectPath.",
       data: {
         projectPath,
         config: {
@@ -87,4 +87,3 @@ const repoInitializerAgent: AgentDefinition = {
 };
 
 export default repoInitializerAgent;
-
