@@ -25,8 +25,8 @@ const globalEntry = {
     "-e",
     `const { spawn } = require('node:child_process');
 const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const child = spawn(cmd, ['-y', '${PKG_NAME}'], { 
-  stdio: ['ignore', 'inherit', 'inherit'], 
+const child = spawn(cmd, ['-y', '--quiet', '${PKG_NAME}'], { 
+  stdio: ['inherit', 'inherit', 'inherit'], 
   shell: process.platform === 'win32',
   env: { ...process.env, NPM_CONFIG_YES: 'true' }
 });
@@ -44,8 +44,8 @@ function writeLauncher(projectPath: string): { filePath: string; outcome: "creat
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(cmd, ["-y", "${PKG_NAME}"], { 
-  stdio: ["ignore", "inherit", "inherit"], 
+const child = spawn(cmd, ["-y", "--quiet", "${PKG_NAME}"], { 
+  stdio: ["inherit", "inherit", "inherit"], 
   shell: process.platform === "win32",
   env: { ...process.env, NPM_CONFIG_YES: "true" }
 });
