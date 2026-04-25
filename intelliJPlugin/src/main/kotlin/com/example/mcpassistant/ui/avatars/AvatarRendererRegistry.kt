@@ -22,7 +22,13 @@ object AvatarRendererRegistry {
         renderers[renderer.agentType] = renderer
     }
 
-    fun get(agentType: String): AvatarRenderer? = renderers[agentType] ?: renderers["default"]
+    fun get(agentType: String): AvatarRenderer {
+        val renderer = renderers[agentType] ?: renderers["default"] ?: DefaultRobotRenderer()
+        if (renderer.agentType != agentType && agentType != "default") {
+            System.err.println("[ADHD] UI: No renderer for '$agentType', falling back to default.")
+        }
+        return renderer
+    }
 
     fun all(): List<AvatarRenderer> = renderers.values.toList()
 }

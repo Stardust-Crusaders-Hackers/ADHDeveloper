@@ -61,7 +61,9 @@ export interface AgentRecommendation {
 }
 
 export interface AgentSummary {
+  id: string;
   name: string;
+  type: string;
   description: string;
   keywords: string[];
 }

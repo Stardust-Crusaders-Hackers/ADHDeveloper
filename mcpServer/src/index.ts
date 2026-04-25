@@ -174,9 +174,12 @@ async function main() {
       description: "List agents registered via plugin bridge",
       inputSchema: z.object({}),
     },
-    async () => ({
-      content: [{ type: "text" as const, text: JSON.stringify({ agents: listAgents() }) }]
-    })
+    async () => {
+      const summaries = registry.getAgentSummaries();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(summaries, null, 2) }],
+      };
+    }
   );
 
   server.registerTool(

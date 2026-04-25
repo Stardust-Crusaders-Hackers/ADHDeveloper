@@ -1,9 +1,10 @@
 package com.example.mcpassistant.ui
 
+import com.intellij.ui.components.JBPanel
 import java.awt.*
 import javax.swing.JPanel
 
-class AudiencePanel : JPanel() {
+class AudiencePanel : JBPanel<AudiencePanel>() {
 
     private val COLS = 8
     private val ROWS = 2
@@ -13,26 +14,32 @@ class AudiencePanel : JPanel() {
     private val seats = arrayOfNulls<AvatarComponent>(COLS * ROWS)
 
     init {
-        layout = null
+        layout = FlowLayout(FlowLayout.CENTER, 10, 10)
         preferredSize = Dimension(COLS * SEAT_W, ROWS * SEAT_H)
+        minimumSize = Dimension(COLS * SEAT_W, SEAT_H)
         background = Color(15, 15, 35)
     }
 
     fun addAgent(avatar: AvatarComponent): Point {
         val idx = seats.indexOfFirst { it == null }
-        if (idx == -1) return Point(0, 0)
-        seats[idx] = avatar
-        val pos = seatPosition(idx, avatar.preferredSize)
-        avatar.bounds = Rectangle(pos.x, pos.y, avatar.preferredSize.width, avatar.preferredSize.height)
+        if (idx != -1) seats[idx] = avatar
+        
         add(avatar)
+        revalidate()
         repaint()
-        return pos
+        
+        // Return a dummy point or calculate center if needed for walk animation
+        return avatar.location
     }
 
-    fun getSeatPosition(avatar: AvatarComponent): Point? {
-        val idx = seats.indexOf(avatar)
-        if (idx == -1) return null
-        return seatPosition(idx, avatar.preferredSize)
+    fun getSeatPosition(avatar: AvatarComponent): Point {
+        return avatar.location
+    }
+
+    fun addAgentSafe(avatar: AvatarComponent) {
+        if (!components.contains(avatar)) {
+            addAgent(avatar)
+        }
     }
 
     fun removeAgent(avatar: AvatarComponent) {

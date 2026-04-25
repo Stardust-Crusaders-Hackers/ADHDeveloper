@@ -25,7 +25,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     var nextIdleAnimAt: Long = System.currentTimeMillis() + randomIdleDelay()
     private var idleAnimFrame: Int = 0
 
-    private val renderer = AvatarRendererRegistry.get(agent.type)
+    private val renderer by lazy { AvatarRendererRegistry.get(agent.type) }
 
     init {
         preferredSize = Dimension(58, 72)
@@ -35,6 +35,11 @@ class AvatarComponent(val agent: Agent) : JComponent() {
 
     override fun paintComponent(g: Graphics) {
         val g2d = g as Graphics2D
+        
+        // Diagnostic: Fill background with semi-transparent color to see component bounds
+        // g2d.color = Color(255, 0, 0, 50)
+        // g2d.fillRect(0, 0, width, height)
+
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
 
@@ -43,14 +48,14 @@ class AvatarComponent(val agent: Agent) : JComponent() {
             g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha.coerceIn(0f, 1f))
         }
 
-        val breathScale = if (state == State.SEATED)
+        val breathScale = if (state == State.SEATED || state == State.SEATED_SCRATCH || state == State.SEATED_LOOK_AROUND)
             1.0f + (Math.sin(animFrame * 0.05) * 0.02).toFloat()
         else
-            stageScale
+            stageScale.coerceAtLeast(0.1f)
 
         val cx = width / 2
-        val avatarSize = (52 * breathScale).toInt().coerceAtLeast(8)
-        val avatarBounds = Rectangle(cx - avatarSize / 2, 0, avatarSize, avatarSize)
+        val avatarSize = (52 * breathScale).toInt().coerceIn(10, width)
+        val avatarBounds = Rectangle(cx - avatarSize / 2, 5, avatarSize, avatarSize)
 
         if (state == State.SEATED_LOOK_AROUND) {
             val skew = Math.sin(idleAnimFrame * 0.15) * 0.15

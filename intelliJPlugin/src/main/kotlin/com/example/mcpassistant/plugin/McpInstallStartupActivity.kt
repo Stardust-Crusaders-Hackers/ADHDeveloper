@@ -18,25 +18,29 @@ class McpInstallStartupActivity : StartupActivity.DumbAware {
         }
     }
 
-    private fun resolveMcpDir(project: Project): File? {
-        if (!StageSettingsState.getInstance().mcpEnabled) return null
-        val dir = findMcpServerDir(project) ?: return null
+    fun resolveMcpDir(project: Project): File? {
+        System.err.println("[MCP-DEBUG] resolveMcpDir called for project: ${project.name}")
+        val settings = StageSettingsState.getInstance()
+        
+        val dir = findMcpServerDir(project) ?: run {
+            System.err.println("[MCP-DEBUG] No mcpServer directory found automatically.")
+            null
+        }
 
         val nodeOk = try {
-            ProcessBuilder("node", "--version").start().waitFor() == 0
-        } catch (_: Exception) { false }
-
-        if (!nodeOk) {
-            notify(project, "Agent Stage: Node.js not found — MCP disabled, state-file polling active", NotificationType.WARNING)
-            return null
+            val p = ProcessBuilder("node", "--version").start()
+            val ok = p.waitFor() == 0
+            System.err.println("[MCP-DEBUG] Node check: $ok")
+            ok
+        } catch (e: Exception) { 
+            System.err.println("[MCP-DEBUG] Node check failed: ${e.message}")
+            false 
         }
 
-        if (!File(dir, "node_modules").exists()) {
-            ProcessBuilder("npm", "install").directory(dir).start().waitFor()
+        if (dir != null) {
+           System.err.println("[MCP-DEBUG] Resolved directory: ${dir.absolutePath}")
         }
-        if (!File(dir, "dist").exists()) {
-            ProcessBuilder("npm", "run", "build").directory(dir).start().waitFor()
-        }
+        
         return dir
     }
 
