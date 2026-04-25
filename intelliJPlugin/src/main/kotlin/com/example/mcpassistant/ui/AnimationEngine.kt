@@ -71,6 +71,10 @@ class AnimationEngine {
         idleAvatars.remove(avatar)
     }
 
+    fun cancelAnimationsFor(avatar: AvatarComponent) {
+        animations.removeAll { it.avatar === avatar }
+    }
+
     private fun tick() {
         val iter = animations.iterator()
         while (iter.hasNext()) {

@@ -7,3 +7,7 @@ approval_mode = "approve"
 
 [mcp_servers."hackathon-mode".tools._hackathon_rules]
 approval_mode = "approve"
+
+[mcp_servers."adhd-developer"]
+command = "node"
+args = [".mcp/adhd-developer-launcher.cjs"]

@@ -46,6 +46,10 @@ class AgentRegistryService(private val project: Project) : Disposable {
         fireOnEDT { listeners.forEach { it.onTaskCompleted(taskId, agentId, result) } }
     }
 
+    fun stagePresentation(presentationId: String, agentId: String, text: String) {
+        fireOnEDT { listeners.forEach { it.onStagePresentation(presentationId, agentId, text) } }
+    }
+
     fun getAgents(): List<AgentState> = agents.values.toList()
 
     private fun fireOnEDT(block: () -> Unit) =

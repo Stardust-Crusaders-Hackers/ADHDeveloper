@@ -6,6 +6,43 @@ import {
   FlowStepSummary,
   OrchestrationResult,
 } from "../types.js";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+
+const STATE_FILE = path.join(os.tmpdir(), "adhd-bridge-state.json");
+
+function writePresentationToState(agentId: string, text: string, agentMeta?: { name: string; description: string }): void {
+  try {
+    let state: Record<string, unknown> = { agents: [], tasks: [], presentations: [] };
+    if (fs.existsSync(STATE_FILE)) {
+      state = JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
+      if (!Array.isArray(state.presentations)) state.presentations = [];
+    }
+    if (!Array.isArray(state.agents)) state.agents = [];
+
+    // Registrar el agente en el JSON si no existe aún
+    const agentsList = state.agents as Array<Record<string, string>>;
+    const alreadyRegistered = agentsList.some((a) => a.id === agentId);
+    if (!alreadyRegistered && agentMeta) {
+      agentsList.push({
+        id: agentId,
+        name: agentMeta.name,
+        type: "agent",
+        description: agentMeta.description,
+      });
+    }
+
+    (state.presentations as unknown[]).push({
+      presentationId: `pres-${Date.now()}`,
+      agentId,
+      text,
+      status: "PENDING",
+      createdAt: Date.now(),
+    });
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+  } catch (_) {}
+}
 
 const CONFIDENCE_THRESHOLD = 0.5;
 const FLOW_TTL_MS = 30 * 60 * 1000;
@@ -97,6 +134,14 @@ export class Orchestrator {
         flowSteps: flow.steps,
       },
     });
+
+
+    // Write presentation to shared JSON so IntelliJ plugin shows the agent on stage
+    const presenterAgentId = participants[participants.length - 1] ?? agentName;
+    const presenterAgent = this.registry.getAgent(presenterAgentId);
+    writePresentationToState(presenterAgentId, explainerResult.message.trim(), presenterAgent
+      ? { name: presenterAgent.name, description: presenterAgent.description }
+      : undefined);
 
     const inlineMessage = [
       result.message.trim(),

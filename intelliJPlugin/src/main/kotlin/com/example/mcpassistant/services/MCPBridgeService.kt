@@ -3,118 +3,100 @@ package com.example.mcpassistant.services
 import com.example.mcpassistant.model.Agent
 import com.example.mcpassistant.model.AgentTask
 import com.example.mcpassistant.model.TaskStatus
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import java.io.File
-import java.io.PrintWriter
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
 class MCPBridgeService(private val project: Project) : Disposable {
 
     private val registry get() = project.service<AgentRegistryService>()
     private val mapper = jacksonObjectMapper()
-    private var process: Process? = null
-    private val readerThread = Executors.newSingleThreadExecutor()
     private val pollExecutor = Executors.newSingleThreadScheduledExecutor()
-    private val requestId = AtomicInteger(1)
-    private var writer: PrintWriter? = null
 
-    // Track known IDs to detect new arrivals on each poll
     private val knownAgentIds = mutableSetOf<String>()
     private val knownTaskIds = mutableSetOf<String>()
+    private val knownPresentationIds = mutableSetOf<String>()
+
+    // Shared state file written by any MCP server process (Junie, Claude, etc.)
+    private val stateFile = File(System.getProperty("java.io.tmpdir"), "adhd-bridge-state.json")
 
     fun start(mcpDir: File) {
-        val pb = ProcessBuilder("node", "dist/index.js")
-            .directory(mcpDir)
-            .redirectErrorStream(false)
-        process = pb.start()
-        writer = PrintWriter(process!!.outputStream.bufferedWriter(), true)
-
-        readerThread.submit { readLoop() }
-
-        // MCP initialization handshake
-        sendRaw(mapOf(
-            "jsonrpc" to "2.0", "id" to requestId.getAndIncrement(),
-            "method" to "initialize",
-            "params" to mapOf(
-                "protocolVersion" to "2024-11-05",
-                "capabilities" to emptyMap<String, Any>(),
-                "clientInfo" to mapOf("name" to "IntelliJPlugin", "version" to "1.0")
-            )
-        ))
-
-        // Poll every 2s for agent/task state changes
-        pollExecutor.scheduleAtFixedRate({ poll() }, 2, 2, TimeUnit.SECONDS)
+        pollExecutor.scheduleAtFixedRate({ poll() }, 1, 2, TimeUnit.SECONDS)
     }
 
     private fun poll() {
-        callTool("agents/list", emptyMap())
-        callTool("tasks/active", emptyMap())
+        if (!stateFile.exists()) return
+        try {
+            val state = mapper.readValue<BridgeState>(stateFile)
+            state.agents.forEach { node ->
+                if (knownAgentIds.add(node.id)) {
+                    registry.registerAgent(Agent(
+                        id = node.id,
+                        name = node.name,
+                        type = node.type,
+                        description = node.description
+                    ))
+                }
+            }
+            state.tasks.filter { it.status == "ACTIVE" }.forEach { node ->
+                if (knownTaskIds.add(node.taskId)) {
+                    registry.startTask(AgentTask(
+                        taskId = node.taskId,
+                        agentId = node.agentId,
+                        description = node.description,
+                        status = TaskStatus.ACTIVE,
+                        result = node.result
+                    ))
+                }
+            }
+            state.tasks.filter { it.status == "COMPLETED" }.forEach { node ->
+                if (knownTaskIds.contains(node.taskId)) {
+                    registry.completeTask(node.taskId, node.agentId, node.result)
+                    knownTaskIds.remove(node.taskId)
+                }
+            }
+            state.presentations.filter { it.status == "PENDING" }.forEach { node ->
+                if (knownPresentationIds.add(node.presentationId)) {
+                    registry.stagePresentation(node.presentationId, node.agentId, node.text)
+                    // Mark as SHOWN in the file so it doesn't fire again
+                    ackPresentation(node.presentationId, state)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
-    private fun readLoop() {
-        process?.inputStream?.bufferedReader()?.forEachLine { line ->
-            try {
-                val msg = mapper.readTree(line)
-                if (msg.has("id") && msg.has("result")) handleResponse(msg)
-            } catch (_: Exception) {}
-        }
-    }
-
-    private fun handleResponse(msg: JsonNode) {
-        val result = msg["result"] ?: return
-        // MCP tool response: result.content[0].text contains JSON payload
-        val text = result["content"]?.get(0)?.get("text")?.asText() ?: return
-        val data = runCatching { mapper.readTree(text) }.getOrNull() ?: return
-
-        data["agents"]?.forEach { node ->
-            val agent = node.toAgent()
-            if (knownAgentIds.add(agent.id)) registry.registerAgent(agent)
-        }
-        data["tasks"]?.forEach { node ->
-            val task = node.toTask()
-            if (knownTaskIds.add(task.taskId)) registry.startTask(task)
-        }
+    private fun ackPresentation(presentationId: String, state: BridgeState) {
+        try {
+            val updated = state.copy(
+                presentations = state.presentations.map {
+                    if (it.presentationId == presentationId) it.copy(status = "SHOWN") else it
+                }
+            )
+            stateFile.writeText(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(updated))
+        } catch (_: Exception) {}
     }
 
     fun callTool(name: String, arguments: Map<String, Any>) {
-        sendRaw(mapOf(
-            "jsonrpc" to "2.0",
-            "id" to requestId.getAndIncrement(),
-            "method" to "tools/call",
-            "params" to mapOf("name" to name, "arguments" to arguments)
-        ))
+        // No-op: state is now shared via file, no direct process needed
     }
-
-    private fun sendRaw(payload: Any) {
-        writer?.println(mapper.writeValueAsString(payload))
-    }
-
-    private fun JsonNode.toAgent() = Agent(
-        id = this["id"].asText(),
-        name = this["name"].asText(),
-        type = this["type"].asText(),
-        description = this["description"]?.asText() ?: ""
-    )
-
-    private fun JsonNode.toTask() = AgentTask(
-        taskId = this["taskId"].asText(),
-        agentId = this["agentId"].asText(),
-        description = this["description"].asText(),
-        status = TaskStatus.valueOf(this["status"]?.asText()?.uppercase() ?: "ACTIVE"),
-        result = this["result"]?.asText() ?: ""
-    )
 
     override fun dispose() {
         pollExecutor.shutdownNow()
-        process?.destroy()
-        readerThread.shutdownNow()
     }
+
+    data class BridgeState(
+        val agents: List<AgentNode> = emptyList(),
+        val tasks: List<TaskNode> = emptyList(),
+        val presentations: List<PresentationNode> = emptyList()
+    )
+    data class AgentNode(val id: String, val name: String, val type: String, val description: String)
+    data class TaskNode(val taskId: String, val agentId: String, val description: String, val status: String, val result: String)
+    data class PresentationNode(val presentationId: String, val agentId: String, val text: String, val status: String, val createdAt: Long = 0)
 }
