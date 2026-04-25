@@ -1,0 +1,3 @@
+[mcp_servers."adhd-developer"]
+command = "node"
+args = [".mcp/adhd-developer-launcher.cjs"]

@@ -55,7 +55,9 @@ export class AgentRegistry {
 
   getAgentSummaries(): AgentSummary[] {
     return this.getAllAgents().map((a) => ({
+      id: a.name, // Use name as ID for now
       name: a.name,
+      type: a.type || "agent",
       description: a.description,
       keywords: a.keywords,
     }));

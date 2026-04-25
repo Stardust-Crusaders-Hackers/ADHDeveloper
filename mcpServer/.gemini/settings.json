@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "adhd-developer": {
+      "command": "node",
+      "args": [
+        ".mcp/adhd-developer-launcher.cjs"
+      ]
+    }
+  }
+}

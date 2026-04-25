@@ -46,6 +46,12 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         animEngine.start()
     }
 
+    fun syncExistingAgents() {
+        service<com.example.mcpassistant.services.AgentRegistryService>().getAgents().forEach { state ->
+            registerAvatar(state.agent)
+        }
+    }
+
     // ── StageUIListener ──────────────────────────────────────────────────────
 
     override fun onAgentRegistered(agent: Agent) {
@@ -204,12 +210,19 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     }
 
     private fun registerAvatar(agent: Agent): AvatarComponent {
-        return avatarMap.computeIfAbsent(agent.id) {
-            AvatarComponent(agent).also { avatar ->
-                audiencePanel.addAgent(avatar)
-                animEngine.trackIdle(avatar)
-            }
-        }
+        val existing = avatarMap[agent.id]
+        if (existing != null) return existing
+
+        System.err.println("[ADHD] UI: Registering avatar for agent: ${agent.name} (type: ${agent.type})")
+        val avatar = AvatarComponent(agent)
+        avatarMap[agent.id] = avatar
+        audiencePanel.addAgent(avatar)
+        animEngine.trackIdle(avatar)
+        
+        revalidate()
+        repaint()
+        System.err.println("[ADHD] UI: Avatar added to audience panel. Current audience size: ${avatarMap.size}")
+        return avatar
     }
 
     private inline fun runOnUiThread(crossinline block: () -> Unit) {

@@ -41,13 +41,35 @@ class MCPBridgeService(private val project: Project) : Disposable {
     private var mcpFailureCount: Int = 0
     private var nextMcpAttemptAt: Long = 0L
 
+    @Synchronized
     fun start(mcpDir: File? = null) {
+        System.err.println("[MCP] Bridge start requested. Current Dir: ${this.mcpDir?.name}, New Dir: ${mcpDir?.name}")
+        
+        if (this.mcpDir == mcpDir && mcpClient != null) {
+            System.err.println("[MCP] Dir unchanged and client exists, skipping restart.")
+            return
+        }
+        
+        closeMcpClient()
         this.mcpDir = mcpDir
         knownAgentIds.addAll(registry.getAgents().map { it.agent.id })
-        pollExecutor.scheduleAtFixedRate({ poll() }, 1, 1, TimeUnit.SECONDS)
+        
+        // Ensure we are polling
+        try {
+            pollExecutor.scheduleAtFixedRate({ poll() }, 1, 1, TimeUnit.SECONDS)
+            System.err.println("[MCP] Polling scheduled.")
+        } catch (e: Exception) {
+            // Already scheduled or other issue
+            System.err.println("[MCP] Polling already active or failed to schedule: ${e.message}")
+        }
     }
 
     private fun poll() {
+        val dir = mcpDir
+        if (dir == null) {
+            closeMcpClient()
+            return
+        }
         pollFromMcp()
     }
 
@@ -57,12 +79,37 @@ class MCPBridgeService(private val project: Project) : Disposable {
         if (now < nextMcpAttemptAt) return false
 
         return try {
-            val snapshot = ensureMcpClient(dir).callFlowState(timeoutMs = 1500)
+            val client = ensureMcpClient(dir)
+            
+            // 1. Sync agents
+            try {
+                val agents = client.callListAgents(timeoutMs = 1500)
+                agents.forEach { summary ->
+                    if (knownAgentIds.add(summary.id)) {
+                        registry.registerAgent(
+                            Agent(
+                                id = summary.id,
+                                name = summary.name,
+                                type = summary.type,
+                                description = summary.description
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                System.err.println("[MCP] Failed to sync agents: ${e.message}")
+            }
+
+            // 2. Sync flow state
+            val snapshot = client.callFlowState(timeoutMs = 1500)
             applyMcpSnapshot(snapshot)
+            
             mcpFailureCount = 0
             nextMcpAttemptAt = 0L
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            System.err.println("[MCP] Poll failed: ${e.message}")
+            e.printStackTrace()
             mcpFailureCount += 1
             val backoff = computeBackoffMs(mcpFailureCount)
             nextMcpAttemptAt = now + backoff
@@ -75,7 +122,7 @@ class MCPBridgeService(private val project: Project) : Disposable {
         val current = snapshot.runningAgents.associateBy { it.taskId }
 
         current.values.forEach { running ->
-            ensureAgentRegistered(running.agentName)
+            ensureAgentRegistered(running.agentName) // Fallback registration
             if (!activeTasksById.containsKey(running.taskId)) {
                 registry.startTask(
                     AgentTask(
@@ -181,6 +228,14 @@ class MCPBridgeService(private val project: Project) : Disposable {
         val startedAt: Long,
     )
 
+    data class AgentSummaryNode(
+        val id: String,
+        val name: String,
+        val type: String,
+        val description: String,
+        val keywords: List<String>
+    )
+
     private class StdioMcpClient(
         private val mapper: ObjectMapper,
         private val workingDir: File,
@@ -212,6 +267,23 @@ class MCPBridgeService(private val project: Project) : Disposable {
 
             sendRequest("initialize", initializeParams, timeoutMs = 3000)
             sendNotification("notifications/initialized", mapper.createObjectNode())
+        }
+
+        fun callListAgents(timeoutMs: Long): List<AgentSummaryNode> {
+            val params = mapper.createObjectNode().apply {
+                put("name", "list_agents")
+                set<JsonNode>("arguments", mapper.createObjectNode())
+            }
+
+            val result = sendRequest("tools/call", params, timeoutMs)
+            val text = result
+                .path("content")
+                .firstOrNull { it.path("type").asText() == "text" }
+                ?.path("text")
+                ?.asText()
+                ?: throw IOException("Missing text content in list_agents MCP response")
+
+            return mapper.readValue(text)
         }
 
         fun callFlowState(timeoutMs: Long): FlowStateSnapshot {
