@@ -8,6 +8,12 @@ version = "0.1.0"
 
 repositories { mavenCentral() }
 
+sourceSets {
+    main {
+        resources.srcDirs("resources")
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -27,6 +33,7 @@ intellij {
     version.set("2023.3")
     type.set("IC")
     plugins.set(listOf("java"))
+    pluginName.set("mcpassistant")
 }
 
 tasks {
