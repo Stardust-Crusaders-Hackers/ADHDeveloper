@@ -11,8 +11,8 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
-import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.InputStream
 import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -247,7 +247,7 @@ class MCPBridgeService(private val project: Project) : Disposable {
             .directory(workingDir)
             .start()
 
-        private val input = BufferedInputStream(process.inputStream)
+        private val input: InputStream = process.inputStream
         private val output = BufferedOutputStream(process.outputStream)
         private val pending = ConcurrentHashMap<Long, CompletableFuture<JsonNode>>()
         private val nextId = AtomicLong(1)
@@ -336,28 +336,22 @@ class MCPBridgeService(private val project: Project) : Disposable {
             sendMessage(payload)
         }
 
+        // MCP SDK 1.x uses newline-delimited JSON, not LSP Content-Length framing
         @Synchronized
         private fun sendMessage(node: JsonNode) {
-            val body = mapper.writeValueAsBytes(node)
-            val header = "Content-Length: ${body.size}\r\n\r\n".toByteArray(StandardCharsets.US_ASCII)
-            output.write(header)
-            output.write(body)
+            val line = (mapper.writeValueAsString(node) + "\n").toByteArray(StandardCharsets.UTF_8)
+            output.write(line)
             output.flush()
         }
 
         private fun readLoop() {
             try {
+                val reader = input.bufferedReader(StandardCharsets.UTF_8)
                 while (process.isAlive) {
-                    val contentLength = readContentLength() ?: break
-                    val payload = ByteArray(contentLength)
-                    var offset = 0
-                    while (offset < contentLength) {
-                        val read = input.read(payload, offset, contentLength - offset)
-                        if (read < 0) throw IOException("Unexpected EOF in MCP payload")
-                        offset += read
-                    }
+                    val line = reader.readLine() ?: break
+                    if (line.isBlank()) continue
 
-                    val message = mapper.readTree(payload)
+                    val message = mapper.readTree(line)
                     val idNode = message.get("id")
                     if (idNode != null && idNode.isNumber) {
                         val id = idNode.asLong()
@@ -380,41 +374,6 @@ class MCPBridgeService(private val project: Project) : Disposable {
                 pending.values.forEach { it.completeExceptionally(e) }
                 pending.clear()
             }
-        }
-
-        private fun readContentLength(): Int? {
-            var contentLength: Int? = null
-            while (true) {
-                val line = readHeaderLine() ?: return null
-                if (line.isBlank()) {
-                    return contentLength
-                }
-
-                val lower = line.lowercase()
-                if (lower.startsWith("content-length:")) {
-                    contentLength = line.substringAfter(':').trim().toIntOrNull()
-                }
-            }
-        }
-
-        private fun readHeaderLine(): String? {
-            val bytes = mutableListOf<Byte>()
-            while (true) {
-                val ch = input.read()
-                if (ch < 0) {
-                    if (bytes.isEmpty()) return null
-                    break
-                }
-                if (ch == '\n'.code) break
-                bytes += ch.toByte()
-            }
-
-            val lineBytes = if (bytes.lastOrNull() == '\r'.code.toByte()) {
-                bytes.dropLast(1).toByteArray()
-            } else {
-                bytes.toByteArray()
-            }
-            return String(lineBytes, StandardCharsets.US_ASCII)
         }
 
         override fun close() {
