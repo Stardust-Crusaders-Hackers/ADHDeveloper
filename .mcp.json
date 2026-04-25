@@ -12,7 +12,7 @@
     "adhd-developer": {
       "command": "node",
       "args": [
-        "mcpServer/dist/index.js"
+        ".mcp/adhd-developer-launcher.cjs"
       ]
     }
   }

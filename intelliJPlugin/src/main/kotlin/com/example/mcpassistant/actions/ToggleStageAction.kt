@@ -7,7 +7,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 class ToggleStageAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val tw = ToolWindowManager.getInstance(project).getToolWindow("AgentStage") ?: return
+        val tw = ToolWindowManager.getInstance(project).getToolWindow("Agent Stage") ?: return
         if (tw.isVisible) tw.hide() else tw.show()
     }
 }

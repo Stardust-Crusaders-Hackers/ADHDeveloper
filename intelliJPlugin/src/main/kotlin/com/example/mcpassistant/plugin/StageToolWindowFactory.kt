@@ -2,6 +2,7 @@ package com.example.mcpassistant.plugin
 
 import com.example.mcpassistant.services.AgentRegistryService
 import com.example.mcpassistant.ui.StagePanel
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -16,5 +17,9 @@ class StageToolWindowFactory : ToolWindowFactory, DumbAware {
 
         val registry = project.service<AgentRegistryService>()
         registry.addListener(panel)
+        content.setDisposer(Disposable {
+            registry.removeListener(panel)
+            panel.dispose()
+        })
     }
 }
