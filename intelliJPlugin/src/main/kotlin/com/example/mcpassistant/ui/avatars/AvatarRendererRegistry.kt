@@ -14,6 +14,7 @@ object AvatarRendererRegistry {
             ResearcherRenderer(),
             ReviewerRenderer(),
             TesterRenderer(),
+            FrontendMasterRenderer(),
         ).forEach { renderers[it.agentType] = it }
     }
 
