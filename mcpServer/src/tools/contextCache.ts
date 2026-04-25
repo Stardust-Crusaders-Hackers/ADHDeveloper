@@ -21,6 +21,12 @@ export interface ReadResult {
   cacheControl?: CacheControl;
 }
 
+export interface TextContentBlock {
+  type: "text";
+  text: string;
+  cache_control?: CacheControl;
+}
+
 export interface CacheInfo {
   entries: Array<{
     filePath: string;
@@ -79,6 +85,14 @@ export function readFile(filePath: string): ReadResult {
     sizeBytes: entry.sizeBytes,
     hits: 0,
     cacheControl: entry.sizeBytes > 1024 ? EPHEMERAL_CACHE_CONTROL : undefined,
+  };
+}
+
+export function toTextContentBlock(result: ReadResult, prefix: string): TextContentBlock {
+  return {
+    type: "text",
+    text: `${prefix}\n\n${result.content}`,
+    ...(result.cacheControl ? { cache_control: result.cacheControl } : {}),
   };
 }
 
