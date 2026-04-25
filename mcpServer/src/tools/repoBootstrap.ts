@@ -1,5 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
+import { buildPatch } from "./patchUtils.js";
+import { FilePatch } from "../types.js";
 
 type OverwritePolicy = "no-overwrite" | "overwrite" | "prompt";
 type Architecture = "monolith" | "modular" | "hexagonal" | "microservices";
@@ -20,6 +22,7 @@ interface BootstrapResult {
   skipped: string[];
   errors: string[];
   notes: string[];
+  patches?: FilePatch[];
 }
 
 const COMMON_GITIGNORE = [
@@ -89,14 +92,23 @@ function uniqueLines(lines: string[]): string[] {
 function mergeLineFile(filePath: string, lines: string[], result: BootstrapResult): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, uniqueLines(lines).join("\n") + "\n");
+    const content = uniqueLines(lines).join("\n") + "\n";
+    fs.writeFileSync(filePath, content);
     result.created.push(filePath);
+    const patch = buildPatch(filePath, "", content);
+    result.patches = result.patches ?? [];
+    result.patches.push(patch);
     return;
   }
-  const existing = fs.readFileSync(filePath, "utf-8").split(/\r?\n/);
+  const existingRaw = fs.readFileSync(filePath, "utf-8");
+  const existing = existingRaw.split(/\r?\n/);
   const merged = uniqueLines([...existing, ...lines]);
-  fs.writeFileSync(filePath, merged.join("\n") + "\n");
+  const mergedContent = merged.join("\n") + "\n";
+  fs.writeFileSync(filePath, mergedContent);
   result.merged.push(filePath);
+  const patch = buildPatch(filePath, existingRaw, mergedContent);
+  result.patches = result.patches ?? [];
+  result.patches.push(patch);
 }
 
 function writeFileByPolicy(
@@ -109,12 +121,20 @@ function writeFileByPolicy(
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, content);
     result.created.push(filePath);
+    const patch = buildPatch(filePath, "", content);
+    result.patches = result.patches ?? [];
+    result.patches.push(patch);
     return;
   }
+
+  const existingRaw = fs.readFileSync(filePath, "utf-8");
 
   if (policy === "overwrite") {
     fs.writeFileSync(filePath, content);
     result.merged.push(filePath);
+    const patch = buildPatch(filePath, existingRaw, content);
+    result.patches = result.patches ?? [];
+    result.patches.push(patch);
     return;
   }
 

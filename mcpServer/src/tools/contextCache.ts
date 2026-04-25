@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { KeyedCache } from "./cache.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ export interface CacheEntry {
   content: string;
   sizeBytes: number;
   cachedAt: number;
+  lastAccessed?: number;
   hits: number;
 }
 
@@ -34,6 +36,7 @@ export interface CacheInfo {
     sizeBytes: number;
     cachedAt: string;
     hits: number;
+    lastAccessed?: string;
   }>;
   totalFiles: number;
   totalSizeBytes: number;
@@ -43,7 +46,8 @@ export interface CacheInfo {
 // ─── Singleton cache ─────────────────────────────────────────────────────────
 // ESM modules are singletons — this Map lives for the full MCP server process.
 
-const cache = new Map<string, CacheEntry>();
+const CONTEXT_CACHE_TTL_MS = Number(process.env.CONTEXT_CACHE_TTL_MS) || (Number(process.env.CONTEXT_CACHE_IDLE_MINUTES) ? Number(process.env.CONTEXT_CACHE_IDLE_MINUTES) * 60 * 1000 : 30 * 60 * 1000);
+const keyedCache = new KeyedCache<CacheEntry>(CONTEXT_CACHE_TTL_MS);
 let totalMisses = 0;
 const EPHEMERAL_CACHE_CONTROL: CacheControl = { type: "ephemeral" };
 
@@ -71,10 +75,13 @@ function getEphemeralThresholdBytes(): number {
  */
 export function readFile(filePath: string): ReadResult {
   const resolved = path.resolve(filePath);
-  const existing = cache.get(resolved);
+  const existing = keyedCache.get(resolved);
 
   if (existing) {
     existing.hits++;
+    existing.lastAccessed = Date.now();
+    // refresh TTL by re-setting entry
+    keyedCache.set(resolved, existing);
     return {
       filePath: resolved,
       content: existing.content,
@@ -91,9 +98,10 @@ export function readFile(filePath: string): ReadResult {
     content,
     sizeBytes: Buffer.byteLength(content, "utf-8"),
     cachedAt: Date.now(),
+    lastAccessed: Date.now(),
     hits: 0,
   };
-  cache.set(resolved, entry);
+  keyedCache.set(resolved, entry);
 
   return {
     filePath: resolved,
@@ -121,7 +129,7 @@ export function getCacheInfo(): CacheInfo & { totalMisses: number } {
   let totalSizeBytes = 0;
   let totalHits = 0;
 
-  const entries = Array.from(cache.entries()).map(([filePath, entry]) => {
+  const entries = keyedCache.entries().map(({ key: filePath, value: entry }) => {
     totalSizeBytes += entry.sizeBytes;
     totalHits += entry.hits;
     return {
@@ -129,12 +137,13 @@ export function getCacheInfo(): CacheInfo & { totalMisses: number } {
       sizeBytes: entry.sizeBytes,
       cachedAt: new Date(entry.cachedAt).toISOString(),
       hits: entry.hits,
+      lastAccessed: entry.lastAccessed ? new Date(entry.lastAccessed).toISOString() : undefined,
     };
   });
 
   return {
     entries,
-    totalFiles: cache.size,
+    totalFiles: entries.length,
     totalSizeBytes,
     totalHits,
     totalMisses,
@@ -146,13 +155,14 @@ export function getCacheInfo(): CacheInfo & { totalMisses: number } {
  * Returns true if the entry existed, false if it wasn't cached.
  */
 export function invalidate(filePath: string): boolean {
-  return cache.delete(path.resolve(filePath));
+  return keyedCache.delete(path.resolve(filePath));
 }
 
 /** Clear all cached entries. Returns number of entries removed. */
 export function clearCache(): number {
-  const count = cache.size;
-  cache.clear();
+  const entries = keyedCache.entries();
+  const count = entries.length;
+  keyedCache.clear();
   totalMisses = 0;
   return count;
 }
