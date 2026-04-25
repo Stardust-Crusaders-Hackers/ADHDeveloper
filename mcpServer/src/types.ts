@@ -30,6 +30,7 @@ export interface AgentDefinition {
   name: string;
   description: string;
   keywords: string[];
+  type?: string;
   handler: (ctx: AgentContext) => Promise<AgentResult>;
 }
 
