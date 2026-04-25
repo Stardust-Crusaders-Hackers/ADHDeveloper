@@ -5,8 +5,8 @@ MCP server designed to assist developers with ADHD through concise planning, foc
 ## Installation
 
 ### Project-Level (Automated)
-If you are inside a project and using an agent that supports the `setup_project` tool:
-1. Run `npx -y adhdeveloper setup_project`
+If you are inside a project and using an agent that supports the `mcp_enable` (or legacy `setup_project`) tool:
+1. Run `npx -y adhdeveloper enable`
 This will automatically configure:
 - **Claude Code** (`.mcp.json`)
 - **Cursor** (`.cursor/mcp.json`)
@@ -15,6 +15,9 @@ This will automatically configure:
 - **OpenAI Codex** (`.codex/config.toml`)
 - **Junie** (`.junie/mcp/mcp.json`)
 - **GitHub Copilot CLI** (Global `~/.copilot/mcp-config.json`)
+
+To remove the integration:
+- Run `npx -y adhdeveloper disable`
 
 ---
 
@@ -52,6 +55,11 @@ Install the `intelliJPlugin` located in this repository or use **Junie** plugin 
 ## Usage
 
 Once installed, your AI agent will have access to specialized "ADHD-friendly" tools:
+
+### MCP Management
+- `mcp_enable`: Enable adhd-developer MCP configuration in supported clients.
+- `mcp_disable`: Disable adhd-developer MCP configuration in supported clients.
+- `setup_project`: Backward-compatible alias of `mcp_enable`.
 
 ### Focus & Planning
 - `orchestrate`: Best for starting a task. The orchestrator breaks down goals into manageable steps.
