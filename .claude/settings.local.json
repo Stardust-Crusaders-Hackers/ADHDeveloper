@@ -1,4 +1,10 @@
 {
+  "enabledMcpjsonServers": [
+    "hackathon-mode"
+  ],
+  "enableAllProjectMcpServers": true
+}
+{
   "permissions": {
     "allow": [
       "Skill(update-config)",
