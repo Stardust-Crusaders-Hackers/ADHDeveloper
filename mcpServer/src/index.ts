@@ -9,6 +9,7 @@ import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
 import { explainSubdirectories } from "./tools/explainSubdirectories.js";
+import { ensureTestPlaybook } from "./tools/testPlaybook.js";
 import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
 import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } from "./tools/contextCache.js";
 
@@ -167,6 +168,20 @@ async function main() {
     },
     async (params) => {
       const result = await explainSubdirectories(params);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "test_playbook",
+    "Analyze the workspace test structure and generate or refresh TESTS.md. Also keeps AGENTS.md, CLAUDE.md, and GEMINI.md pointed at the playbook when it changes.",
+    {
+      projectPath: z.string().optional().describe("Project root or workspace root. Defaults to the current working directory."),
+    },
+    async ({ projectPath }) => {
+      const result = ensureTestPlaybook(projectPath);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
