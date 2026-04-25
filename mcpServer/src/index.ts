@@ -8,6 +8,7 @@ import { AgentRegistry } from "./registry/agentRegistry.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { setupProject } from "./tools/setupProject.js";
 import { repoBootstrap, type RepoBootstrapConfig } from "./tools/repoBootstrap.js";
+import { explainSubdirectories } from "./tools/explainSubdirectories.js";
 import { listAgents, listActiveTasks, registerAgent, startTask, completeTask } from "./handlers.js";
 import { readFile, getCacheInfo, invalidate, clearCache } from "./tools/contextCache.js";
 
@@ -146,6 +147,26 @@ async function main() {
         overwritePolicy: config.overwritePolicy,
       };
       const result = await repoBootstrap(projectPath, bootstrapConfig);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "explain_subdirectories",
+    "Create/merge per-subdirectory conceptual and architectural docs, list contents, and add recommended workflow notes with stack-aware file format handling.",
+    {
+      projectPath: z.string().describe("Absolute path to the project root"),
+      language: z.string().optional().describe("Output language (e.g. 'es', 'en'). If omitted, inferred from runtime locale."),
+      stack: z.string().optional().describe("Optional stack override (python, java, node, etc.)"),
+      includeHidden: z.boolean().optional().describe("Whether to include hidden directories/files. Default: false"),
+      maxDepth: z.number().int().min(1).max(32).optional().describe("Maximum recursion depth for subdirectories. Default: 8"),
+      overwritePolicy: z.enum(["merge", "overwrite", "no-overwrite"]).optional().describe("Conflict policy when target file exists. Default: merge"),
+      fallbackFilename: z.string().optional().describe("Fallback filename when format cannot be inferred. Default: index.md"),
+    },
+    async (params) => {
+      const result = await explainSubdirectories(params);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
       };
