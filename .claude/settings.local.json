@@ -32,7 +32,9 @@
       "mcp__adhd-developer__flow_state",
       "mcp__adhd-developer__task_start",
       "mcp__adhd-developer__task_complete",
-      "mcp__adhd-developer__tasks_active"
+      "mcp__adhd-developer__tasks_active",
+      "PowerShell(cd C:\\\\Users\\\\kwolf\\\\Desktop\\\\UPC\\\\hack2025\\\\ADHDeveloper; git log --oneline -10 -- intelliJPlugin/src/main/kotlin/com/example/mcpassistant/ui/AudiencePanel.kt)",
+      "PowerShell(git checkout *)"
     ],
     "defaultMode": "acceptEdits"
   },

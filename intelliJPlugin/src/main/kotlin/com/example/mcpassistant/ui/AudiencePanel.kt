@@ -2,38 +2,33 @@ package com.example.mcpassistant.ui
 
 import com.intellij.ui.components.JBPanel
 import java.awt.*
+import javax.swing.JPanel
 
 class AudiencePanel : JBPanel<AudiencePanel>() {
 
-    private val MAX_COLS = 8
+    private val COLS = 8
+    private val ROWS = 2
     private val SEAT_W = 80
     private val SEAT_H = 100
 
-    // Grows as agents are registered; null = agent is temporarily on stage (seat reserved).
-    private val seats = mutableListOf<AvatarComponent?>()
-
-    private val agentCount: Int get() = seats.size
-    private val cols: Int get() = if (agentCount == 0) 1 else minOf(agentCount, MAX_COLS)
-    private val rows: Int get() = if (agentCount == 0) 1 else (agentCount + cols - 1) / cols
+    private val seats = arrayOfNulls<AvatarComponent>(COLS * ROWS)
 
     init {
         layout = FlowLayout(FlowLayout.CENTER, 10, 10)
+        preferredSize = Dimension(COLS * SEAT_W, ROWS * SEAT_H)
         minimumSize = Dimension(200, SEAT_H)
         background = Color(15, 15, 35)
-        updatePreferredSize()
-    }
-
-    private fun updatePreferredSize() {
-        preferredSize = Dimension(cols * SEAT_W, rows * SEAT_H)
     }
 
     fun addAgent(avatar: AvatarComponent): Point {
         val idx = seats.indexOfFirst { it == null }
-        if (idx == -1) seats.add(avatar) else seats[idx] = avatar
-        updatePreferredSize()
+        if (idx != -1) seats[idx] = avatar
+        
         add(avatar)
         revalidate()
         repaint()
+        
+        // Return a dummy point or calculate center if needed for walk animation
         return avatar.location
     }
 
@@ -56,13 +51,23 @@ class AudiencePanel : JBPanel<AudiencePanel>() {
 
     fun allAvatars(): List<AvatarComponent> = seats.filterNotNull()
 
+    private fun seatPosition(idx: Int, size: Dimension): Point {
+        val col = idx % COLS
+        val row = idx / COLS
+        val x = col * SEAT_W + (SEAT_W - size.width) / 2
+        val y = row * SEAT_H + 10
+        return Point(x, y)
+    }
+
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)
         val g2d = g as Graphics2D
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-        repeat(agentCount) { i ->
-            drawChair(g2d, (i % cols) * SEAT_W, (i / cols) * SEAT_H)
+        for (row in 0 until ROWS) {
+            for (col in 0 until COLS) {
+                drawChair(g2d, col * SEAT_W, row * SEAT_H)
+            }
         }
     }
 
