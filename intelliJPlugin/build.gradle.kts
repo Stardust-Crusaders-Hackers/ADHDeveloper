@@ -8,6 +8,21 @@ version = "0.1.0"
 
 repositories { mavenCentral() }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions.jvmTarget = "17"
+}
+
+dependencies {
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
+    implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
+}
+
 intellij {
     version.set("2023.3")
     type.set("IC")
@@ -17,5 +32,9 @@ intellij {
 tasks {
     wrapper {
         gradleVersion = "8.3"
+    }
+    patchPluginXml {
+        sinceBuild.set("233")
+        untilBuild.set("243.*")
     }
 }

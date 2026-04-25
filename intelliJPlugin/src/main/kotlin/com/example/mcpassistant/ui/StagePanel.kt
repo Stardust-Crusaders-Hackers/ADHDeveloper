@@ -3,6 +3,17 @@ package com.example.mcpassistant.ui
 import com.example.mcpassistant.model.Agent
 import com.example.mcpassistant.model.AgentTask
 import com.intellij.openapi.project.Project
+<<<<<<< backend-impl
+import javax.swing.JLabel
+import javax.swing.JPanel
+
+// Stub — Dev B replaces this with the full Swing UI implementation
+class StagePanel(project: Project) : JPanel(), StageUIListener {
+    init { add(JLabel("Agent Stage — UI coming soon")) }
+    override fun onAgentRegistered(agent: Agent) {}
+    override fun onTaskStarted(task: AgentTask) {}
+    override fun onTaskCompleted(taskId: String, agentId: String, result: String) {}
+=======
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.components.JBPanel
 import java.awt.*
@@ -120,4 +131,5 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     fun dispose() {
         animEngine.stop()
     }
+>>>>>>> develop
 }
