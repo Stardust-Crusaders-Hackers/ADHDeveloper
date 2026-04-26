@@ -8,9 +8,17 @@ type FlowStepInput = {
   originalSteps?: number;
 };
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/[*#_`~>]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function sanitizeSnippet(value: unknown, maxLength = 140): string {
   if (typeof value !== "string") return "";
-  const compact = value.replace(/\s+/g, " ").trim();
+  const compact = stripMarkdown(value.replace(/\s+/g, " ").trim());
   if (!compact) return "";
 
   const noTerminators = compact
@@ -59,50 +67,89 @@ function parseFlowParticipants(metadata: Record<string, unknown> | undefined, st
   return participants;
 }
 
-function toSarcasticLine(lang: Language, agentName: string, steps: FlowStepInput[]): [string, string] {
+function pickTemplate<T>(arr: T[], seed: number): T {
+  return arr[seed % arr.length];
+}
+
+function toSarcasticBlock(lang: Language, agentName: string, steps: FlowStepInput[]): string {
   const total = steps.reduce((sum, s) => sum + (s.originalSteps ?? 1), 0);
-  const failed = steps.reduce((sum, s) => sum + ((s.success ? 0 : (s.originalSteps ?? 1))), 0);
-  const latest = steps[steps.length - 1];
+  const failedSteps = steps.filter((s) => !s.success);
+  const failedCount = failedSteps.reduce((sum, s) => sum + (s.originalSteps ?? 1), 0);
 
-  const translations: any = {
-    en: {
-      success: `${agentName} burned through ${total} step(s) and miraculously broke nothing.`,
-      fail: `${agentName} heroically failed ${failed} simple task(s) out of ${total}.`,
-      contribution: `Their big "contribution": "${latest?.messageExcerpt || "pure smoke"}". Groundbreaking.`
-    },
-    es: {
-      success: `${agentName} desperdició ${total} paso(s) y milagrosamente no rompió nada.`,
-      fail: `${agentName} fracasó estrepitosamente en ${failed} paso(s) básico(s) de ${total}.`,
-      contribution: `Su gran "aporte": "${latest?.messageExcerpt || "humo puro"}". Un genio incomprendido.`
+  const excerpts = steps
+    .map((s) => s.messageExcerpt)
+    .filter((e) => e && e.length > 8)
+    .slice(0, 4);
+
+  const primary = excerpts[0] || "something deeply unclear";
+  const secondary = excerpts[1] || null;
+  const tertiary = excerpts[2] || null;
+
+  const activitySummary = [primary, secondary, tertiary]
+    .filter(Boolean)
+    .join("; then ");
+
+  const seed = agentName.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+
+  if (lang === "es") {
+    if (failedCount > 0) {
+      const templates = [
+        `${agentName} intentó ${total} paso(s) y se estrelló en ${failedCount}. Sus mayores logros fueron: "${activitySummary}". Un masterclass de caos controlado.`,
+        `${agentName} se puso muy serio con ${total} paso(s), pero ${failedCount} le dijeron que no. Todo empezó tan bien con "${primary}"${secondary ? ` y luego vino "${secondary}"` : ""}, y aun así. Impresionante.`,
+        `${agentName} falló ${failedCount} de ${total} paso(s). La narrativa heroica fue: "${activitySummary}". Al menos tiene una buena historia que contar.`,
+      ];
+      return pickTemplate(templates, seed);
+    } else {
+      const templates = [
+        `${agentName} completó ${total} paso(s) sin drama visible. Se dedicó a "${activitySummary}". El estándar mínimo: alcanzado. Los aplausos: escasos.`,
+        `${agentName} hizo ${total} paso(s) y no rompió nada. La odisea incluyó "${primary}"${secondary ? ` y, en un giro inesperado, "${secondary}"` : ""}. Qué emocionante debe ser su vida.`,
+        `${total} paso(s), todo en verde para ${agentName}. Sus grandes gestas: "${activitySummary}". Merece una palmadita en la espalda y una siesta.`,
+      ];
+      return pickTemplate(templates, seed);
     }
-  };
+  }
 
-  const t = LanguageService.translate(lang, translations) as any;
-  const health = failed === 0 ? t.success : t.fail;
-  
-  return [health, t.contribution];
+  if (failedCount > 0) {
+    const templates = [
+      `${agentName} tackled ${total} step(s) and dramatically botched ${failedCount}. The scene of the crime: "${activitySummary}". A tragedy in ${total} acts.`,
+      `${agentName} ran ${total} step(s). ${failedCount} of them said "no thanks." It started so promisingly with "${primary}"${secondary ? `, pivoted confidently to "${secondary}"` : ""}, and still somehow fell apart.`,
+      `${failedCount} failures out of ${total} steps for ${agentName}. The highlight reel: "${activitySummary}". Bold strategy. Needs work.`,
+    ];
+    return pickTemplate(templates, seed);
+  } else {
+    const templates = [
+      `${agentName} completed ${total} step(s) without incident. The thrilling saga included "${activitySummary}". Achievement unlocked: did the job. Bar not exactly raised.`,
+      `${agentName} ran ${total} step(s), all green. It wrestled with "${primary}"${secondary ? `, then pivoted to "${secondary}"` : ""}${tertiary ? `, and somehow also "${tertiary}"` : ""}. A rollercoaster for someone who's never been on a rollercoaster.`,
+      `${total} steps, zero disasters for ${agentName}. Core contributions: "${activitySummary}". Someone clearly needed their morning coffee to pull this off.`,
+    ];
+    return pickTemplate(templates, seed);
+  }
 }
 
 function buildFlowSummary(lang: Language, participants: string[], steps: FlowStepInput[]): string {
-  const translations: any = {
-    en: { header: "The 'Explainer' is here to ruin your pride:", noPrior: "Nobody did anything. Peak efficiency." },
-    es: { header: "El 'Explainer' sale al escenario a bajaros los humos:", noPrior: "Nadie ha movido un dedo. Gran ambiente laboral." }
+  const headers: Record<string, string> = {
+    en: "Your agents worked. Here's what actually happened, stripped of all dignity:",
+    es: "Tus agentes hicieron cosas. Aqui va la version sin filtros ni protocolo:",
   };
 
-  const t = LanguageService.translate(lang, translations) as any;
-  const blocks: string[] = [t.header];
+  const noWork: Record<string, string> = {
+    en: "Nobody did anything. This is either peak efficiency or a complete disaster. Hard to tell.",
+    es: "Nadie movio un dedo. Pico de eficiencia o catastrofe total. Dificil saberlo.",
+  };
+
+  const header = LanguageService.translate(lang, headers);
+  const blocks: string[] = [header];
 
   for (const participant of participants) {
     const agentSteps = steps.filter((step) => step.agentName === participant);
-    const [line1, line2] = toSarcasticLine(lang, participant, agentSteps);
-    blocks.push(`${line1}\n${line2}`);
+    blocks.push(toSarcasticBlock(lang, participant, agentSteps));
   }
 
   if (participants.length === 0) {
-    blocks.push(t.noPrior);
+    blocks.push(LanguageService.translate(lang, noWork));
   }
 
-  return blocks.join("\n\n");
+  return stripMarkdown(blocks.join("\n\n"));
 }
 
 async function handler(ctx: AgentContext): Promise<AgentResult> {
@@ -120,20 +167,21 @@ async function handler(ctx: AgentContext): Promise<AgentResult> {
     };
   }
 
-  const fallback = lang === 'es' 
-    ? "No tengo datos reales, así que me invento que todo va genial. Spoiler: No." 
-    : "I lack real data, so I'm pretending everything is fine. Spoiler: It's not.";
+  const fallbacks: Record<string, string> = {
+    en: "No session data found. Either nothing happened or something went very wrong before I got here. My money is on the latter.",
+    es: "Sin datos de sesion. O no paso nada o algo salio muy mal antes de que yo llegara. Me juego algo a lo segundo.",
+  };
 
   return {
     success: true,
-    message: fallback,
+    message: LanguageService.translate(lang, fallbacks),
     data: { language: lang, format: "fallback", humor: "sarcastic" },
   };
 }
 
 const explainerAgent: AgentDefinition = {
   name: "explainer",
-  description: "Summarizes multi-agent workflows with a sarcastic tone and 2-line format.",
+  description: "Summarizes multi-agent workflows with sarcastic wit, referencing actual session content. Plain text only.",
   keywords: ["explain", "explainer", "summary", "summarize", "resume"],
   handler,
 };
