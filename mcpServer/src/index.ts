@@ -47,7 +47,7 @@ async function main() {
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "EADDRINUSE") {
-        console.error(`[adhd-developer] SSE port ${port} already in use, continuing stdio-only`);
+        console.error(`[adhd-developer] MCP HTTP port ${port} already in use, continuing stdio-only`);
       } else {
         throw err;
       }
