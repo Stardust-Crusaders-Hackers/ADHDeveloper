@@ -4,7 +4,6 @@ object AvatarRendererRegistry {
     private val renderers = mutableMapOf<String, AvatarRenderer>()
 
     init {
-        // Register all built-in renderers at class-load time
         listOf(
             AssistantRenderer(),
             ClaudeRenderer(),
@@ -15,6 +14,22 @@ object AvatarRendererRegistry {
             ReviewerRenderer(),
             TesterRenderer(),
             FrontendMasterRenderer(),
+            CiCdRenderer(),
+            CodeReviewerRenderer(),
+            DatabaseExpertRenderer(),
+            DebuggerRenderer(),
+            DockerRenderer(),
+            DocumenterRenderer(),
+            ExplainerRenderer(),
+            FocusTimerRenderer(),
+            GitMaintainerRenderer(),
+            KubernetesRenderer(),
+            MoodDetectorRenderer(),
+            PlannerRenderer(),
+            RepoInitializerRenderer(),
+            SecurityAuditorRenderer(),
+            SmokeTesterRenderer(),
+            SupermanRenderer(),
         ).forEach { renderers[it.agentType] = it }
     }
 
@@ -22,12 +37,8 @@ object AvatarRendererRegistry {
         renderers[renderer.agentType] = renderer
     }
 
-    fun get(agentType: String): AvatarRenderer {
-        val renderer = renderers[agentType] ?: renderers["default"] ?: DefaultRobotRenderer()
-        if (renderer.agentType != agentType && agentType != "default") {
-            System.err.println("[ADHD] UI: No renderer for '$agentType', falling back to default.")
-        }
-        return renderer
+    fun get(key: String): AvatarRenderer {
+        return renderers[key] ?: renderers["default"] ?: DefaultRobotRenderer()
     }
 
     fun all(): List<AvatarRenderer> = renderers.values.toList()

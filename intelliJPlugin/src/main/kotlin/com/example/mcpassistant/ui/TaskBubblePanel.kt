@@ -12,7 +12,8 @@ class TaskBubblePanel : JPanel() {
 
     init {
         isOpaque = false
-        preferredSize = Dimension(380, 80)
+        preferredSize = Dimension(400, 90)
+        minimumSize = Dimension(120, 50)
     }
 
     fun setText(newText: String) {

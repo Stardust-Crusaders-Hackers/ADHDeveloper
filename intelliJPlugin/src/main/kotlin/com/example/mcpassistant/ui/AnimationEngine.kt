@@ -97,7 +97,8 @@ class AnimationEngine {
         val t = easeInOut(anim.progress)
         val x = lerp(anim.startPos.x.toFloat(), anim.endPos.x.toFloat(), t).toInt()
         val y = lerp(anim.startPos.y.toFloat(), anim.endPos.y.toFloat(), t).toInt()
-        val bob = (sin(anim.avatar.animFrame * 0.8) * 3).toInt()
+        val bobAmp = (anim.avatar.height / 24f).coerceIn(1f, 5f)
+        val bob = (sin(anim.avatar.animFrame * 0.8) * bobAmp).toInt()
         anim.avatar.bounds = java.awt.Rectangle(x, y + bob, anim.avatar.width, anim.avatar.height)
         anim.avatar.stageScale = lerp(1f, 2f, t)
         if (anim.progress >= 1f) {
@@ -108,7 +109,7 @@ class AnimationEngine {
     }
 
     private fun tickDisappear(anim: Animation.Disappear) {
-        anim.avatar.alpha = max(0f, anim.avatar.alpha - 0.033f)
+        anim.avatar.alpha = max(0f, anim.avatar.alpha - 0.05f)
         anim.avatar.repaint()
         if (anim.avatar.alpha <= 0f) {
             anim.done = true
