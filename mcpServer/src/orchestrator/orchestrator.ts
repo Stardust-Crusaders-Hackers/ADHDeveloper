@@ -4,10 +4,12 @@ import {
   AgentResult,
   AgentRecommendation,
   ClosedPresentationEvent,
+  ErrorServerEvent,
   FlowStateResponse,
   FlowStepSummary,
   OrchestrationResult,
-  PresentationEmitter,
+  PresentationPayload,
+  ServerEventEmitter,
   RunningAgentMetadata,
 } from "../types.js";
 
@@ -38,7 +40,7 @@ export class Orchestrator {
   private closedPresentations: ClosedPresentationEvent[] = [];
   private implicitFlowCounter = 0;
 
-  constructor(private registry: AgentRegistry, private emit: PresentationEmitter) {}
+  constructor(private registry: AgentRegistry, private emit: ServerEventEmitter) {}
 
   evaluate(query: string): OrchestrationResult {
     const agents = this.registry.getAllAgents();
@@ -94,9 +96,15 @@ export class Orchestrator {
       agentName,
       startedAt: Date.now(),
     });
+    this.emitAgentStarted(taskId, flowId, agentName, context);
 
     try {
-      const result = await this.runAgent(agentName, { ...context, emit: this.emit });
+      const startedAt = this.activeExecutions.get(taskId)?.startedAt ?? Date.now();
+      const result = await this.runAgent(agentName, {
+        ...context,
+        emit: (payload) => this.emitPresentation(payload),
+      });
+      this.emitAgentCompleted(taskId, flowId, agentName, startedAt, result);
       this.appendFlowStep(flow, {
         agentName,
         success: result.success,
@@ -131,7 +139,7 @@ export class Orchestrator {
       const presenterId = "explainer"; // Fuerza al agente explainer a salir al escenario
       const presentationText = explainerResult.message.trim();
       const presenterAgent = this.registry.getAgent(presenterId);
-      this.emit({
+      this.emitPresentation({
         presentationId: `pres-${Date.now()}`,
         agentId: presenterId,
         agentName: presenterAgent?.name ?? presenterId,
@@ -198,6 +206,17 @@ export class Orchestrator {
       return await agent.handler(context);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
+      this.emitError({
+        eventId: `error:${agentName}:${Date.now()}`,
+        type: "error",
+        timestamp: Date.now(),
+        payload: {
+          scope: "agent_execution",
+          message: `Agent "${agentName}" failed`,
+          agentName,
+          detail,
+        },
+      });
       return {
         success: false,
         message: `Agent "${agentName}" failed: ${detail}`,
@@ -352,5 +371,60 @@ export class Orchestrator {
       participants: this.collectParticipants(flow.steps),
       steps: flow.steps,
     };
+  }
+
+  private emitPresentation(payload: PresentationPayload): void {
+    this.emit({
+      eventId: payload.presentationId || `presentation:${Date.now()}`,
+      type: "presentation",
+      timestamp: Date.now(),
+      payload,
+    });
+  }
+
+  private emitAgentStarted(taskId: string, flowId: string, agentName: string, context: AgentContext): void {
+    const startedAt = this.activeExecutions.get(taskId)?.startedAt ?? Date.now();
+    this.emit({
+      eventId: `agent_started:${taskId}`,
+      type: "agent_started",
+      timestamp: startedAt,
+      payload: {
+        taskId,
+        flowId,
+        agentName,
+        startedAt,
+        query: context.query,
+        metadata: context.metadata,
+      },
+    });
+  }
+
+  private emitAgentCompleted(
+    taskId: string,
+    flowId: string,
+    agentName: string,
+    startedAt: number,
+    result: AgentResult,
+  ): void {
+    const finishedAt = Date.now();
+    this.emit({
+      eventId: `agent_completed:${taskId}`,
+      type: "agent_completed",
+      timestamp: finishedAt,
+      payload: {
+        taskId,
+        flowId,
+        agentName,
+        startedAt,
+        finishedAt,
+        durationMs: Math.max(0, finishedAt - startedAt),
+        success: result.success,
+        messageExcerpt: this.toExcerpt(result.message),
+      },
+    });
+  }
+
+  private emitError(event: ErrorServerEvent): void {
+    this.emit(event);
   }
 }

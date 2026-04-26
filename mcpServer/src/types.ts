@@ -7,6 +7,73 @@ export interface PresentationPayload {
 }
 
 export type PresentationEmitter = (payload: PresentationPayload) => void;
+export type ServerEventType = "presentation" | "agent_started" | "agent_completed" | "error" | "END";
+
+export interface ServerEventBase {
+  eventId: string;
+  type: ServerEventType;
+  timestamp: number;
+  payload: unknown;
+}
+
+export interface PresentationServerEvent extends ServerEventBase {
+  type: "presentation";
+  payload: PresentationPayload;
+}
+
+export interface AgentStartedServerEvent extends ServerEventBase {
+  type: "agent_started";
+  payload: {
+    taskId: string;
+    flowId: string;
+    agentName: string;
+    startedAt: number;
+    query: string;
+    metadata?: Record<string, unknown>;
+  };
+}
+
+export interface AgentCompletedServerEvent extends ServerEventBase {
+  type: "agent_completed";
+  payload: {
+    taskId: string;
+    flowId: string;
+    agentName: string;
+    startedAt: number;
+    finishedAt: number;
+    durationMs: number;
+    success: boolean;
+    messageExcerpt: string;
+  };
+}
+
+export interface ErrorServerEvent extends ServerEventBase {
+  type: "error";
+  payload: {
+    scope: string;
+    message: string;
+    taskId?: string;
+    flowId?: string;
+    agentName?: string;
+    detail?: string;
+  };
+}
+
+export interface EndServerEvent extends ServerEventBase {
+  type: "END";
+  payload: {
+    reason: string;
+  };
+}
+
+export type ServerEvent =
+  | PresentationServerEvent
+  | AgentStartedServerEvent
+  | AgentCompletedServerEvent
+  | ErrorServerEvent
+  | EndServerEvent;
+
+export type ServerEventEmitter = (event: ServerEvent) => void;
 
 export interface AgentContext {
   query: string;
