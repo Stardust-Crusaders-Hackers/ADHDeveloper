@@ -11,11 +11,13 @@ import { readFile, getCacheInfo, invalidate, clearCache, toTextContentBlock } fr
 import { runBenchmark } from "./benchmark.js";
 import { executeSandbox } from "./sandbox.js";
 import { planExecution } from "./loadBalancer.js";
+import { emitPresentation, SharedState } from "../shared.js";
 
 export function registerAllTools(
   server: McpServer,
   orchestrator: Orchestrator,
   registry: AgentRegistry,
+  shared: SharedState,
 ): void {
   server.registerTool(
     "orchestrate",
@@ -487,6 +489,43 @@ export function registerAllTools(
     async ({ tasks }) => {
       const plan = planExecution(tasks);
       return { content: [{ type: "text" as const, text: JSON.stringify(plan, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    "stage_queue",
+    {
+      description:
+        "Queue messages for agents to deliver on stage. Each entry walks the agent on stage, displays the text for " +
+        "20 seconds, then exits with a 2-second gap before the next agent. Entries are processed in FIFO order.",
+      inputSchema: z.object({
+        entries: z
+          .array(
+            z.object({
+              agentId: z.string().describe("Agent ID to put on stage (must match a registered agent name)"),
+              text: z.string().describe("Message the agent will display on stage"),
+            }),
+          )
+          .min(1)
+          .describe("Ordered list of (agentId, text) pairs to queue"),
+      }),
+    },
+    async ({ entries }) => {
+      const now = Date.now();
+      for (let i = 0; i < entries.length; i++) {
+        const { agentId, text } = entries[i];
+        const agentSummary = registry.getAgentSummaries().find((a) => a.id === agentId || a.name === agentId);
+        emitPresentation(shared, {
+          presentationId: `stage_queue:${agentId}:${now}:${i}`,
+          agentId,
+          agentName: agentSummary?.name ?? agentId,
+          agentType: agentSummary?.type ?? "agent",
+          text,
+        });
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ ok: true, queued: entries.length }, null, 2) }],
+      };
     },
   );
 

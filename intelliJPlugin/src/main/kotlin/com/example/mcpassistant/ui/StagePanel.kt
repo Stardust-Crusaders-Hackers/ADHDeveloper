@@ -3,7 +3,6 @@ package com.example.mcpassistant.ui
 import com.example.mcpassistant.model.Agent
 import com.example.mcpassistant.model.AgentTask
 import com.example.mcpassistant.services.ElevenLabsService
-import com.example.mcpassistant.settings.StageSettingsState
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBPanel
@@ -11,21 +10,23 @@ import java.awt.*
 import java.awt.event.HierarchyEvent
 import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CompletableFuture
 import javax.swing.*
 import javax.swing.Timer
 
 class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayout()), StageUIListener {
+
+    private data class QueueEntry(val agentId: String, val text: String)
 
     private val audiencePanel = AudiencePanel()
     private val stageCenterPanel = StageCenterPanel()
     private val taskBubble = TaskBubblePanel()
     private val animEngine = AnimationEngine()
     private val avatarMap = ConcurrentHashMap<String, AvatarComponent>()
-    private val presentingAgents = ConcurrentHashMap.newKeySet<String>()
 
-    private val taskQueue: LinkedList<AgentTask> = LinkedList()
+    private val stageQueue: LinkedList<QueueEntry> = LinkedList()
     private var stageOccupied = false
-    private val activeTasks = java.util.concurrent.ConcurrentHashMap<String, AgentTask>()
+    private val activeTasks = ConcurrentHashMap<String, AgentTask>()
 
     init {
         background = Color(10, 10, 25)
@@ -68,119 +69,74 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
     override fun onTaskStarted(task: AgentTask) {
         runOnUiThread {
             activeTasks[task.agentId] = task
-            val avatar = avatarMap[task.agentId] ?: return@runOnUiThread
+            avatarMap[task.agentId] ?: return@runOnUiThread
             taskBubble.setText(buildHumorText(task))
         }
     }
 
     override fun onTaskCompleted(taskId: String, agentId: String, result: String) {
-        if (agentId in presentingAgents) return
         runOnUiThread {
             val task = activeTasks.remove(agentId) ?: AgentTask(taskId, agentId, result)
-            if (stageOccupied) {
-                taskQueue.add(task)
-            } else {
-                walkToStage(task)
-            }
+            enqueueEntry(agentId, buildHumorText(task))
         }
     }
 
     override fun onStagePresentation(presentationId: String, agentId: String, text: String) {
         runOnUiThread {
-            val avatar = ensureAvatar(agentId)
-
-            presentingAgents.add(agentId)
-            animEngine.cancelAnimationsFor(avatar)
-            animEngine.untrackIdle(avatar)
-            avatar.state = AvatarComponent.State.WALKING
-
-            val seatPosInAudience = audiencePanel.getSeatPosition(avatar)
-            val audienceInPanel = seatPosInAudience
-                ?.let { SwingUtilities.convertPoint(audiencePanel, it, this) }
-                ?: Point(width / 2, height - 100)
-
-            audiencePanel.remove(avatar)
-            audiencePanel.revalidate()
-            audiencePanel.repaint()
-            avatar.bounds = java.awt.Rectangle(audienceInPanel.x, audienceInPanel.y, avatar.preferredSize.width, avatar.preferredSize.height)
-            avatar.isVisible = true
-            add(avatar)
-            revalidate()
-            repaint()
-
-            val stageTarget = stageCenter()
-            taskBubble.setText(text)
-
-            val settings = StageSettingsState.getInstance()
-            if (settings.ttsEnabled) {
-                project.service<ElevenLabsService>().speak(text, avatar.agent.type)
-            }
-
-            animEngine.walkToStage(avatar, audienceInPanel, stageTarget) {
-                SwingUtilities.invokeLater {
-                    stageCenterPanel.showAvatar(avatar)
-                    Timer(30_000) {
-                        SwingUtilities.invokeLater {
-                            animEngine.disappear(avatar) {
-                                SwingUtilities.invokeLater {
-                                    stageCenterPanel.clearStage()
-                                    taskBubble.clear()
-                                    presentingAgents.remove(agentId)
-                                    returnAvatarToSeat(avatar) {}
-                                }
-                            }
-                        }
-                    }.apply { isRepeats = false; start() }
-                }
-            }
+            ensureAvatar(agentId)
+            enqueueEntry(agentId, text)
         }
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
 
-    private fun walkToStage(task: AgentTask) {
-        val avatar = avatarMap[task.agentId] ?: return
-        val seatPos = audiencePanel.getSeatPosition(avatar) ?: return
+    private fun enqueueEntry(agentId: String, text: String) {
+        if (stageOccupied) {
+            stageQueue.add(QueueEntry(agentId, text))
+        } else {
+            walkToStage(QueueEntry(agentId, text))
+        }
+    }
+
+    private fun walkToStage(entry: QueueEntry) {
+        val avatar = avatarMap[entry.agentId] ?: return
+        val seatPos = audiencePanel.getSeatPosition(avatar)
 
         stageOccupied = true
         animEngine.untrackIdle(avatar)
         avatar.state = AvatarComponent.State.WALKING
 
-        // Convert seat position to StagePanel coordinates
-        val audienceInPanel = SwingUtilities.convertPoint(audiencePanel, seatPos, this)
+        val audienceInPanel = seatPos
+            ?.let { SwingUtilities.convertPoint(audiencePanel, it, this) }
+            ?: Point(width / 2, height - 100)
 
-        // Reparent to StagePanel so the avatar is visible while walking across panels
         audiencePanel.remove(avatar)
         audiencePanel.revalidate()
         audiencePanel.repaint()
-        avatar.bounds = java.awt.Rectangle(audienceInPanel.x, audienceInPanel.y, avatar.preferredSize.width, avatar.preferredSize.height)
+        avatar.bounds = Rectangle(audienceInPanel.x, audienceInPanel.y, avatar.preferredSize.width, avatar.preferredSize.height)
         avatar.isVisible = true
         add(avatar)
         revalidate()
         repaint()
 
-        val humorText = buildHumorText(task)
-
         animEngine.walkToStage(avatar, audienceInPanel, stageCenter()) {
             SwingUtilities.invokeLater {
                 stageCenterPanel.showAvatar(avatar)
-                taskBubble.setText(humorText)
+                taskBubble.setText(entry.text)
 
-                val tts = project.service<ElevenLabsService>().speak(humorText, avatar.agent.type)
-                val minDisplay = java.util.concurrent.CompletableFuture<Void>()
+                val tts = project.service<ElevenLabsService>().speak(entry.text, avatar.agent.id)
+                val minDisplay = CompletableFuture<Void>()
                 Timer(20_000) { minDisplay.complete(null) }.apply { isRepeats = false; start() }
 
-                java.util.concurrent.CompletableFuture.allOf(tts, minDisplay).thenRun {
+                CompletableFuture.allOf(tts, minDisplay).thenRun {
                     SwingUtilities.invokeLater {
-                        if (task.agentId !in presentingAgents) {
-                            animEngine.disappear(avatar) {
-                                SwingUtilities.invokeLater {
-                                    stageCenterPanel.clearStage()
-                                    taskBubble.clear()
-                                    returnAvatarToSeat(avatar) {
-                                        stageOccupied = false
-                                        dequeueNextTask()
-                                    }
+                        animEngine.disappear(avatar) {
+                            SwingUtilities.invokeLater {
+                                stageCenterPanel.clearStage()
+                                taskBubble.clear()
+                                returnAvatarToSeat(avatar) {
+                                    stageOccupied = false
+                                    dequeueNext()
                                 }
                             }
                         }
@@ -190,9 +146,9 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         }
     }
 
-    private fun dequeueNextTask() {
-        val next = taskQueue.poll() ?: return
-        Timer(2_000) { SwingUtilities.invokeLater { walkToStage(next) } }.apply { isRepeats = false; start() }
+    private fun dequeueNext() {
+        val next = stageQueue.poll() ?: return
+        Timer(1_000) { SwingUtilities.invokeLater { walkToStage(next) } }.apply { isRepeats = false; start() }
     }
 
     private fun returnAvatarToSeat(avatar: AvatarComponent, onDone: () -> Unit) {
@@ -202,7 +158,7 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         avatar.isVisible = true
         val seatPos = audiencePanel.getSeatPosition(avatar)
         if (seatPos != null) {
-            avatar.bounds = java.awt.Rectangle(seatPos.x, seatPos.y, avatar.preferredSize.width, avatar.preferredSize.height)
+            avatar.bounds = Rectangle(seatPos.x, seatPos.y, avatar.preferredSize.width, avatar.preferredSize.height)
             if (avatar.parent !== audiencePanel) audiencePanel.add(avatar)
             audiencePanel.revalidate()
             audiencePanel.repaint()
@@ -241,7 +197,7 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         avatarMap[agent.id] = avatar
         audiencePanel.addAgent(avatar)
         animEngine.trackIdle(avatar)
-        
+
         revalidate()
         repaint()
         System.err.println("[ADHD] UI: Avatar added to audience panel. Current audience size: ${avatarMap.size}")
