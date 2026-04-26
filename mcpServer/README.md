@@ -2,7 +2,9 @@
 
 Overview
 
-`mcpServer` is the core Node.js implementation of ADHDeveloper. It provides a set of named agents, tools, and the MCP transport logic used by clients. The server is distributed as a Docker image for easy usage, and also runs locally for development.
+`mcpServer` is the core Node.js implementation of ADHDeveloper. It provides a set of named agents, tools, and the MCP transport logic used by clients over HTTP. The server is distributed as a Docker image for easy usage, and also runs locally for development.
+
+HTTP API reference: [`API.md`](./API.md)
 
 Docker (recommended)
 
@@ -10,16 +12,23 @@ The official image is published on Docker Hub as `imaandrw/mcp-app`.
 
 ```bash
 docker pull imaandrw/mcp-app:latest
-docker run -i --rm imaandrw/mcp-app:latest
+docker run --rm -p 3001:3001 imaandrw/mcp-app:latest
 ```
 
 Notes:
-- `-i` keeps stdin open (required for stdio transport).
+- The container exposes an HTTP server on port `3001`.
 - `--rm` removes the container when it exits.
 
 Client configuration examples
 
-Use the same `docker run` invocation for any client that supports stdio transport. Example client snippets:
+Clients should connect over HTTP. The server exposes:
+
+- `ALL /mcp` for MCP over Streamable HTTP.
+- `GET /agents` to list agent templates.
+- `GET /events` for server-sent events.
+- `GET /health` for health checks.
+
+Legacy stdio client snippets below are no longer applicable and should be replaced with HTTP-based client configuration.
 
 Claude Code (`.claude/mcp.json`):
 
