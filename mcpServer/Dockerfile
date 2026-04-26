@@ -24,4 +24,4 @@ RUN npm install --omit=dev --ignore-scripts
 
 EXPOSE 3001
 
-CMD ["node", "dist/index.js", "--sse"]
+CMD ["node", "dist/index.js"]
