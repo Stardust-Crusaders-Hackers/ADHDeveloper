@@ -160,11 +160,11 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         repaint()
 
         val humorText = buildHumorText(task)
-        taskBubble.setText(humorText)
 
         animEngine.walkToStage(avatar, audienceInPanel, stageCenter()) {
             SwingUtilities.invokeLater {
                 stageCenterPanel.showAvatar(avatar)
+                taskBubble.setText(humorText)
 
                 val tts = project.service<ElevenLabsService>().speak(humorText, avatar.agent.type)
                 val minDisplay = java.util.concurrent.CompletableFuture<Void>()
@@ -192,7 +192,7 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
 
     private fun dequeueNextTask() {
         val next = taskQueue.poll() ?: return
-        walkToStage(next)
+        Timer(2_000) { SwingUtilities.invokeLater { walkToStage(next) } }.apply { isRepeats = false; start() }
     }
 
     private fun returnAvatarToSeat(avatar: AvatarComponent, onDone: () -> Unit) {
