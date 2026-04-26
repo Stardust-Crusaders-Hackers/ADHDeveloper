@@ -1,6 +1,6 @@
 {
   "name": "adhdeveloper",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "MCP server for ADHD-friendly development assistance",
   "type": "module",
   "main": "dist/index.js",
@@ -20,10 +20,9 @@
     "build": "tsc",
     "prepare": "npm run build",
     "start": "node dist/index.js",
-    "start:sse": "node dist/index.js --sse",
-    "start:dual": "node dist/index.js",
+    "start:sse": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "dev:sse": "tsx src/index.ts --sse"
+    "dev:sse": "tsx src/index.ts"
   },
   "license": "MIT",
   "author": "Stardust-Crusaders-Hackers (https://github.com/Stardust-Crusaders-Hackers)",
