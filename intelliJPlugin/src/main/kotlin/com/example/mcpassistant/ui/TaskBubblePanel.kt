@@ -6,14 +6,15 @@ import javax.swing.JPanel
 class TaskBubblePanel : JPanel() {
 
     private var text: String = ""
-    private val bubbleFill = Color(255, 255, 240, 230)
-    private val bubbleBorder = Color(180, 180, 140)
-    private val textColor = Color(30, 30, 30)
+    private val bubbleFill = Color(255, 255, 255, 250)
+    private val bubbleBorder = Color(210, 215, 230, 180)
+    private val textColor = Color(45, 50, 70)
+    private val shadowColor = Color(0, 0, 40, 25)
 
     init {
         isOpaque = false
-        preferredSize = Dimension(400, 90)
-        minimumSize = Dimension(120, 50)
+        preferredSize = Dimension(420, 100)
+        minimumSize = Dimension(140, 60)
     }
 
     fun setText(newText: String) {
@@ -33,49 +34,59 @@ class TaskBubblePanel : JPanel() {
         val g2d = g as Graphics2D
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB)
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
 
-        val tailH = 10
-        val bubbleX = 10
+        val tailH = 12
+        val margin = 12
+        val bubbleX = margin
         val bubbleY = tailH
-        val bubbleW = width - 20
-        val bubbleH = height - tailH - 4
+        val bubbleW = width - (margin * 2)
+        val bubbleH = height - tailH - 6
+        val arc = 24
 
-        // Drop shadow
-        g2d.color = Color(0, 0, 0, 40)
-        g2d.fillRoundRect(bubbleX + 2, bubbleY + 2, bubbleW, bubbleH, 20, 20)
+        // Multi-layered Shadow for "depth"
+        g2d.color = shadowColor
+        g2d.fillRoundRect(bubbleX, bubbleY + 2, bubbleW, bubbleH, arc, arc)
+        g2d.color = Color(0, 0, 0, 15)
+        g2d.fillRoundRect(bubbleX, bubbleY + 4, bubbleW, bubbleH, arc, arc)
 
-        // Bubble fill
+        // Clean solid fill
         g2d.color = bubbleFill
-        g2d.fillRoundRect(bubbleX, bubbleY, bubbleW, bubbleH, 20, 20)
+        g2d.fillRoundRect(bubbleX, bubbleY, bubbleW, bubbleH, arc, arc)
 
-        // Bubble border
+        // Bubble border (Glass effect)
         g2d.color = bubbleBorder
-        g2d.stroke = BasicStroke(1.5f)
-        g2d.drawRoundRect(bubbleX, bubbleY, bubbleW, bubbleH, 20, 20)
+        g2d.stroke = BasicStroke(1.2f)
+        g2d.drawRoundRect(bubbleX, bubbleY, bubbleW, bubbleH, arc, arc)
 
-        // Tail pointing upward toward avatar
+        // Tail pointing upward toward avatar - styled
         val tailCx = width / 2
-        val tailXs = intArrayOf(tailCx - 8, tailCx + 8, tailCx)
-        val tailYs = intArrayOf(bubbleY, bubbleY, 0)
+        val tailXs = intArrayOf(tailCx - 10, tailCx + 10, tailCx)
+        val tailYs = intArrayOf(bubbleY + 1, bubbleY + 1, 2)
+        
         g2d.color = bubbleFill
         g2d.fillPolygon(tailXs, tailYs, 3)
         g2d.color = bubbleBorder
-        g2d.stroke = BasicStroke(1.5f)
-        g2d.drawLine(tailCx - 8, bubbleY, tailCx, 0)
-        g2d.drawLine(tailCx + 8, bubbleY, tailCx, 0)
+        g2d.stroke = BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        g2d.drawLine(tailCx - 10, bubbleY, tailCx, 2)
+        g2d.drawLine(tailCx + 10, bubbleY, tailCx, 2)
 
-        // Text
+        // Text with modern font and spacing
         g2d.color = textColor
-        g2d.font = Font("SansSerif", Font.ITALIC, 13)
-        drawWrappedText(g2d, text, bubbleX + 16, bubbleY + 22, bubbleW - 32)
+        g2d.font = Font("Segoe UI", Font.PLAIN, 14)
+        if (g2d.font.name == "Dialog") { // Fallback for non-windows
+            g2d.font = Font("SansSerif", Font.PLAIN, 14)
+        }
+        
+        drawWrappedText(g2d, text, bubbleX + 20, bubbleY + 24, bubbleW - 40)
     }
 
     private fun drawWrappedText(g2d: Graphics2D, text: String, x: Int, y: Int, maxWidth: Int) {
         val fm = g2d.fontMetrics
-        val words = text.split(" ")
+        val words = text.split("\\s+".toRegex())
         var line = ""
         var lineY = y
-        val lineHeight = fm.height + 2
+        val lineHeight = fm.height + 3
 
         for (word in words) {
             val candidate = if (line.isEmpty()) word else "$line $word"
@@ -83,12 +94,12 @@ class TaskBubblePanel : JPanel() {
                 g2d.drawString(line, x, lineY)
                 line = word
                 lineY += lineHeight
-                if (lineY > height - 10) break
+                if (lineY > height - 12) break
             } else {
                 line = candidate
             }
         }
-        if (line.isNotEmpty() && lineY <= height - 10) {
+        if (line.isNotEmpty() && lineY <= height - 12) {
             g2d.drawString(line, x, lineY)
         }
     }
