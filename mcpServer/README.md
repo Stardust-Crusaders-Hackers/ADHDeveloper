@@ -4,6 +4,8 @@ Overview
 
 `mcpServer` is the core Node.js implementation of ADHDeveloper. It provides a set of named agents, tools, and the MCP transport logic used by clients over HTTP. The server is distributed as a Docker image for easy usage, and also runs locally for development.
 
+HTTP API reference: [`API.md`](./API.md)
+
 Docker (recommended)
 
 The official image is published on Docker Hub as `imaandrw/mcp-app`.
