@@ -14,6 +14,7 @@ class StageSettingsState : PersistentStateComponent<StageSettingsState> {
     var ttsEnabled: Boolean = true
     var elevenLabsApiKey: String = ""
     var elevenLabsVoiceId: String = "21m00Tcm4TlvDq8ikWAM"
+    var voiceIdByType: MutableMap<String, String> = mutableMapOf()
 
     override fun getState(): StageSettingsState = this
 
@@ -22,8 +23,11 @@ class StageSettingsState : PersistentStateComponent<StageSettingsState> {
     }
 
     fun loadFromEnv(projectBasePath: String?) {
-        val envFile = projectBasePath?.let { File(it, ".env") }
-        if (envFile == null || !envFile.exists()) return
+        val envFile = listOfNotNull(
+            projectBasePath?.let { File(it, ".env") },
+            projectBasePath?.let { File(it, "src/.env") },
+            projectBasePath?.let { File(it, "intelliJPlugin/src/.env") },
+        ).firstOrNull { it.exists() } ?: return
 
         envFile.readLines().forEach { line ->
             val trimmed = line.trim()
@@ -32,11 +36,15 @@ class StageSettingsState : PersistentStateComponent<StageSettingsState> {
             if (eqIdx <= 0) return@forEach
             val key = trimmed.substring(0, eqIdx).trim()
             val value = trimmed.substring(eqIdx + 1).trim().removeSurrounding("\"")
-            when (key) {
-                "MCP_SSE_PORT" -> value.toIntOrNull()?.let { port = it }
-                "ELEVENLABS_API_KEY" -> elevenLabsApiKey = value
-                "TTS_ENABLED" -> ttsEnabled = value.toBooleanStrictOrNull() ?: true
-                "ELEVENLABS_VOICE_ID" -> elevenLabsVoiceId = value
+            when {
+                key == "MCP_SSE_PORT" -> value.toIntOrNull()?.let { port = it }
+                key == "ELEVENLABS_API_KEY" -> elevenLabsApiKey = value
+                key == "TTS_ENABLED" -> ttsEnabled = value.toBooleanStrictOrNull() ?: true
+                key == "ELEVENLABS_VOICE_ID" -> elevenLabsVoiceId = value
+                key.startsWith("ELEVENLABS_VOICE_") -> {
+                    val type = key.removePrefix("ELEVENLABS_VOICE_").lowercase()
+                    voiceIdByType[type] = value
+                }
             }
         }
     }

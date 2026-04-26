@@ -25,6 +25,7 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
 
     private val taskQueue: LinkedList<AgentTask> = LinkedList()
     private var stageOccupied = false
+    private val activeTasks = java.util.concurrent.ConcurrentHashMap<String, AgentTask>()
 
     init {
         background = Color(10, 10, 25)
@@ -67,28 +68,20 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
 
     override fun onTaskStarted(task: AgentTask) {
         runOnUiThread {
-            if (stageOccupied) {
-                taskQueue.add(task)
-            } else {
-                walkToStage(task)
-            }
+            activeTasks[task.agentId] = task
+            val avatar = avatarMap[task.agentId] ?: return@runOnUiThread
+            taskBubble.setText(buildHumorText(task))
         }
     }
 
     override fun onTaskCompleted(taskId: String, agentId: String, result: String) {
         if (agentId in presentingAgents) return
         runOnUiThread {
-            val avatar = avatarMap[agentId] ?: return@runOnUiThread
-
-            animEngine.disappear(avatar) {
-                SwingUtilities.invokeLater {
-                    stageCenterPanel.clearStage()
-                    taskBubble.clear()
-                    returnAvatarToSeat(avatar) {
-                        stageOccupied = false
-                        dequeueNextTask()
-                    }
-                }
+            val task = activeTasks.remove(agentId) ?: AgentTask(taskId, agentId, result)
+            if (stageOccupied) {
+                taskQueue.add(task)
+            } else {
+                walkToStage(task)
             }
         }
     }
@@ -167,10 +160,34 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         revalidate()
         repaint()
 
-        taskBubble.setText(buildHumorText(task))
+        val humorText = buildHumorText(task)
+        taskBubble.setText(humorText)
 
         animEngine.walkToStage(avatar, audienceInPanel, stageCenter()) {
-            SwingUtilities.invokeLater { stageCenterPanel.showAvatar(avatar) }
+            SwingUtilities.invokeLater {
+                stageCenterPanel.showAvatar(avatar)
+
+                val tts = project.service<ElevenLabsService>().speak(humorText, avatar.agent.type)
+                val minDisplay = java.util.concurrent.CompletableFuture<Void>()
+                Timer(20_000) { minDisplay.complete(null) }.apply { isRepeats = false; start() }
+
+                java.util.concurrent.CompletableFuture.allOf(tts, minDisplay).thenRun {
+                    SwingUtilities.invokeLater {
+                        if (task.agentId !in presentingAgents) {
+                            animEngine.disappear(avatar) {
+                                SwingUtilities.invokeLater {
+                                    stageCenterPanel.clearStage()
+                                    taskBubble.clear()
+                                    returnAvatarToSeat(avatar) {
+                                        stageOccupied = false
+                                        dequeueNextTask()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

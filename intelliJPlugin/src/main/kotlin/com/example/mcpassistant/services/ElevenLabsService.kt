@@ -31,7 +31,8 @@ class ElevenLabsService {
 
         Thread {
             try {
-                val voiceId = settings.elevenLabsVoiceId.ifBlank { "21m00Tcm4TlvDq8ikWAM" }
+                val voiceId = settings.voiceIdByType[agentType.lowercase()]
+                ?: settings.elevenLabsVoiceId.ifBlank { "21m00Tcm4TlvDq8ikWAM" }
                 val body = """{"text":"${text.replace("\"", "\\\"")}","model_id":"eleven_monolingual_v1","voice_settings":{"stability":0.5,"similarity_boost":0.75}}"""
 
                 val request = Request.Builder()
