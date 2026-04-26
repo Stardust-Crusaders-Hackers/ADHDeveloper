@@ -25,7 +25,7 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     var nextIdleAnimAt: Long = System.currentTimeMillis() + randomIdleDelay()
     private var idleAnimFrame: Int = 0
 
-    private val renderer by lazy { AvatarRendererRegistry.get(agent.type) }
+    private val renderer by lazy { AvatarRendererRegistry.get(agent.id) }
 
     init {
         preferredSize = Dimension(58, 72)
@@ -36,11 +36,6 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     override fun paintComponent(g: Graphics) {
         val g2d = g as Graphics2D
         
-        // Diagnostic: Fill background to verify component bounds and paint invocation
-        g2d.color = Color(255, 0, 0, 50)
-        g2d.fillRect(0, 0, width, height)
-        System.err.println("[ADHD] paintComponent called for ${agent.name}, size=${width}x${height}, alpha=$alpha")
-
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
 
@@ -79,7 +74,6 @@ class AvatarComponent(val agent: Agent) : JComponent() {
     private fun drawHeadAndBody(g2d: Graphics2D, bounds: Rectangle, cx: Int) {
         drawHead(g2d, bounds)
         renderer?.drawBody(g2d, bounds, animFrame, state)
-        renderer?.drawRoleIcon(g2d, cx, bounds.y + bounds.height / 2, 10)
         drawEyes(g2d, bounds)
     }
 
@@ -115,13 +109,14 @@ class AvatarComponent(val agent: Agent) : JComponent() {
 
     private fun drawIdleOverlay(g2d: Graphics2D, bounds: Rectangle) {
         if (state == State.SEATED_SCRATCH) {
+            val scale = bounds.width / 52f
             val progress = (idleAnimFrame % 16) / 16.0
             val armAngle = (Math.PI * 0.5 * Math.sin(progress * Math.PI)).toFloat()
             val cx = (bounds.x + bounds.width / 2).toFloat()
-            val shoulderY = (bounds.y + bounds.height * 2 / 3).toFloat()
+            val shoulderY = (bounds.y + bounds.height * 0.6f)
             g2d.color = renderer?.bodyColor ?: Color.GRAY
-            g2d.stroke = BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-            val armLen = bounds.width / 3f
+            g2d.stroke = BasicStroke((2f * scale).coerceIn(1f, 4f), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+            val armLen = bounds.width * 0.35f
             val armEndX = (cx + armLen * Math.cos(armAngle - Math.PI / 4)).toInt()
             val armEndY = (shoulderY - armLen * Math.sin(armAngle.toDouble())).toInt()
             g2d.drawLine(cx.toInt(), shoulderY.toInt(), armEndX, armEndY)
