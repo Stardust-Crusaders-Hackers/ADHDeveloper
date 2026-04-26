@@ -18,10 +18,10 @@ class ElevenLabsService {
     private val log = Logger.getInstance(ElevenLabsService::class.java)
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    fun speak(text: String, agentType: String): CompletableFuture<Void> {
+    fun speak(text: String, agentId: String): CompletableFuture<Void> {
         val settings = StageSettingsState.getInstance()
         if (!settings.ttsEnabled || settings.elevenLabsApiKey.isBlank()) {
             return CompletableFuture.completedFuture(null)
@@ -31,20 +31,20 @@ class ElevenLabsService {
 
         Thread {
             try {
-                val voiceId = settings.voiceIdByType[agentType.lowercase()]
-                ?: settings.elevenLabsVoiceId.ifBlank { "21m00Tcm4TlvDq8ikWAM" }
-                val body = """{"text":"${text.replace("\"", "\\\"")}","model_id":"eleven_monolingual_v1","voice_settings":{"stability":0.5,"similarity_boost":0.75}}"""
+                val voiceId = settings.voiceIdByType[agentId.lowercase()]
+                    ?: settings.elevenLabsVoiceId.ifBlank { "JBFqnCBsd6RMkjVDRZzb" }
+
+                val body = """{"text":"${text.replace("\"", "\\\"")}","model_id":"eleven_v3","voice_settings":{"stability":0.5,"similarity_boost":0.75}}"""
 
                 val request = Request.Builder()
                     .url("https://api.elevenlabs.io/v1/text-to-speech/$voiceId")
                     .addHeader("xi-api-key", settings.elevenLabsApiKey)
-                    .addHeader("Accept", "audio/mpeg")
                     .post(body.toRequestBody("application/json".toMediaType()))
                     .build()
 
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        log.warn("ElevenLabs TTS failed: ${response.code}")
+                        log.warn("ElevenLabs TTS failed: ${response.code} — ${response.body?.string()}")
                         future.complete(null)
                         return@Thread
                     }
@@ -54,23 +54,24 @@ class ElevenLabsService {
                         return@Thread
                     }
 
-                    val audioIn = AudioSystem.getAudioInputStream(BufferedInputStream(responseBody.byteStream()))
-                    val baseFormat = audioIn.format
-                    val decodedFormat = AudioFormat(
+                    // mp3spi registers itself as a javax.sound.sampled SPI — AudioSystem
+                    // picks it up automatically and decodes the MP3 stream.
+                    val mp3Stream = AudioSystem.getAudioInputStream(BufferedInputStream(responseBody.byteStream()))
+                    val base = mp3Stream.format
+                    val pcmFormat = AudioFormat(
                         AudioFormat.Encoding.PCM_SIGNED,
-                        baseFormat.sampleRate,
-                        16,
-                        baseFormat.channels,
-                        baseFormat.channels * 2,
-                        baseFormat.sampleRate,
-                        false
+                        base.sampleRate, 16,
+                        base.channels, base.channels * 2,
+                        base.sampleRate, false
                     )
-                    val decodedStream = AudioSystem.getAudioInputStream(decodedFormat, audioIn)
+                    val pcmStream = AudioSystem.getAudioInputStream(pcmFormat, mp3Stream)
                     val clip = AudioSystem.getClip()
-                    clip.open(decodedStream)
+                    clip.open(pcmStream)
                     clip.addLineListener { event ->
                         if (event.type == LineEvent.Type.STOP) {
                             clip.close()
+                            pcmStream.close()
+                            mp3Stream.close()
                             future.complete(null)
                         }
                     }

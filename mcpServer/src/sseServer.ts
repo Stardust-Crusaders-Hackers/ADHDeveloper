@@ -44,7 +44,7 @@ export function startSseServer(shared: SharedState, port: number): Promise<void>
           }
 
           const server = new McpServer({ name: "adhd-developer", version: "1.0.0" });
-          registerAllTools(server, shared.orchestrator, shared.registry);
+          registerAllTools(server, shared.orchestrator, shared.registry, shared);
 
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),

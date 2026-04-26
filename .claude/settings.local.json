@@ -36,7 +36,8 @@
       "PowerShell(cd C:\\\\Users\\\\kwolf\\\\Desktop\\\\UPC\\\\hack2025\\\\ADHDeveloper; git log --oneline -10 -- intelliJPlugin/src/main/kotlin/com/example/mcpassistant/ui/AudiencePanel.kt)",
       "PowerShell(git checkout *)",
       "mcp__hackathon-mode__get_mode_status",
-      "mcp__hackathon-mode__time_check"
+      "mcp__hackathon-mode__time_check",
+      "mcp__adhd-developer__execute_agent"
     ],
     "defaultMode": "acceptEdits"
   },
