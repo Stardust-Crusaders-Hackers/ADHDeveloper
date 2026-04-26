@@ -37,15 +37,14 @@ class StagePanel(private val project: Project) : JBPanel<StagePanel>(BorderLayou
         }
 
         val splitPane = JSplitPane(JSplitPane.VERTICAL_SPLIT, stageArea, audiencePanel).apply {
-            resizeWeight = 0.65
+            resizeWeight = 0.55
             isContinuousLayout = true
             border = null
-            dividerSize = 4
+            dividerSize = 2
             background = Color(10, 10, 25)
-            // Set initial divider once the pane has a real size
             addHierarchyListener { e ->
                 if (e.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L && isShowing) {
-                    SwingUtilities.invokeLater { setDividerLocation(0.65) }
+                    SwingUtilities.invokeLater { setDividerLocation(0.55) }
                 }
             }
         }

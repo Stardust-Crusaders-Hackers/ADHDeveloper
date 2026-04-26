@@ -25,14 +25,17 @@ class AssistantRenderer : AvatarRenderer {
         g2d.color = Color(255, 255, 255, 80)
         g2d.fillOval(bodyX + bodyW / 2 - 5, bodyY - 2, 10, 8)
 
-        // Left arm
+        // Arms — scaled to body
+        val scale = bodyW / 32f
+        val swingAmp = (12 * scale).coerceIn(4f, 16f)
         val walkSwing = if (state == AvatarComponent.State.WALKING)
-            (Math.sin(frame * 0.25) * 12).toInt() else 0
+            (Math.sin(frame * 0.25) * swingAmp).toInt() else 0
+        val armStroke = (4f * scale).coerceIn(2f, 6f)
+        val armReach = (8 * scale).coerceIn(3f, 12f).toInt()
         g2d.color = bodyColor
-        g2d.stroke = BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-        g2d.drawLine(bodyX + 2, bodyY + 4, bodyX - 8, bodyY + bodyH / 2 + walkSwing)
-        // Right arm
-        g2d.drawLine(bodyX + bodyW - 2, bodyY + 4, bodyX + bodyW + 8, bodyY + bodyH / 2 - walkSwing)
+        g2d.stroke = BasicStroke(armStroke, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        g2d.drawLine(bodyX + 2, bodyY + 4, bodyX - armReach, bodyY + bodyH / 2 + walkSwing)
+        g2d.drawLine(bodyX + bodyW - 2, bodyY + 4, bodyX + bodyW + armReach, bodyY + bodyH / 2 - walkSwing)
 
         // Hair — long dark hair behind head
         val headSize = bounds.width / 2
