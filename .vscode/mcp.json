@@ -9,7 +9,7 @@
       ]
     },
     "adhd-developer": {
-      "type": "http",
+      "type": "sse",
       "url": "http://localhost:2999/mcp"
     }
   }

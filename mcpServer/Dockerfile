@@ -14,14 +14,16 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
+ARG PORT=3001
+
 ENV NODE_ENV=production
-ENV MCP_SSE_PORT=3001
+ENV MCP_SSE_PORT=${PORT}
 
 COPY package.json ./
 COPY --from=builder /app/dist ./dist
 
 RUN npm install --omit=dev --ignore-scripts
 
-EXPOSE 3001
+EXPOSE ${PORT}
 
 CMD ["node", "dist/index.js"]

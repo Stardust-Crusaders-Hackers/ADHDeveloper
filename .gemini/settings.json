@@ -8,7 +8,10 @@
       ]
     },
     "adhd-developer": {
-      "url": "http://localhost:2999/mcp"
+      "command": "node",
+      "args": [
+        ".mcp/adhd-developer-launcher.cjs"
+      ]
     }
   }
 }

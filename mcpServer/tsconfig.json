@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true
-  }
+  },
+  "exclude": ["dist", "node_modules", "example.mts", "example.d.mts"]
 }

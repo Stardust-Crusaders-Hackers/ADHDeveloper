@@ -2,8 +2,8 @@
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(cmd, ["-y", "--quiet", "adhdeveloper@latest"], { 
-  stdio: ["inherit", "inherit", "inherit"], 
+const child = spawn(cmd, ["-y", "--quiet", "adhdeveloper@latest", "--stdio"], {
+  stdio: ["inherit", "inherit", "inherit"],
   shell: process.platform === "win32",
   env: { ...process.env, NPM_CONFIG_YES: "true" }
 });

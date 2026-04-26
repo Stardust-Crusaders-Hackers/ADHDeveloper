@@ -17,15 +17,19 @@ export interface SetupResult {
 const SERVER_KEY = "adhd-developer";
 const PKG_NAME = "adhdeveloper@latest";
 const LAUNCHER_RELATIVE_PATH = ".mcp/adhd-developer-launcher.cjs";
+const DEFAULT_PORT = 2999;
+const MCP_URL = `http://localhost:${DEFAULT_PORT}/mcp`;
 const launchEntry = { command: "node", args: [LAUNCHER_RELATIVE_PATH] };
-const vscodeEntry = { type: "stdio", command: "node", args: [LAUNCHER_RELATIVE_PATH] };
+const httpEntry = { type: "http", url: MCP_URL };
+const sseEntry = { type: "sse", url: MCP_URL };
+const vscodeEntry = { type: "sse", url: MCP_URL };
 const globalEntry = {
   command: "node",
   args: [
     "-e",
     `const { spawn } = require('node:child_process');
 const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const child = spawn(cmd, ['-y', '--quiet', '${PKG_NAME}'], { 
+const child = spawn(cmd, ['-y', '--quiet', '${PKG_NAME}', '--stdio'], {
   stdio: ['inherit', 'inherit', 'inherit'], 
   shell: process.platform === 'win32',
   env: { ...process.env, NPM_CONFIG_YES: 'true' }
@@ -44,8 +48,8 @@ function writeLauncher(projectPath: string): { filePath: string; outcome: "creat
 const { spawn } = require("node:child_process");
 
 const cmd = process.platform === "win32" ? "npx.cmd" : "npx";
-const child = spawn(cmd, ["-y", "--quiet", "${PKG_NAME}"], { 
-  stdio: ["inherit", "inherit", "inherit"], 
+const child = spawn(cmd, ["-y", "--quiet", "${PKG_NAME}", "--stdio"], {
+  stdio: ["inherit", "inherit", "inherit"],
   shell: process.platform === "win32",
   env: { ...process.env, NPM_CONFIG_YES: "true" }
 });
@@ -172,15 +176,15 @@ export async function enableMcp(projectPath: string): Promise<SetupResult> {
   if (launcher.patch) { result.patches = result.patches ?? []; result.patches.push(launcher.patch); }
 
   const configs: Array<() => void> = [
-    // Claude Code
+    // Claude Code — StreamableHTTP
     () => {
       const file = path.join(projectPath, ".mcp.json");
-      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      const res = mergeJson(file, SERVER_KEY, httpEntry, "mcpServers");
       track(res.outcome, file);
       if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
-    // VS Code Copilot
+    // VS Code Copilot — SSE (StreamableHTTP GET endpoint)
     () => {
       const file = path.join(projectPath, ".vscode", "mcp.json");
       const res = mergeJson(file, SERVER_KEY, vscodeEntry, "servers");
@@ -210,10 +214,10 @@ export async function enableMcp(projectPath: string): Promise<SetupResult> {
       if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
 
-    // Cursor
+    // Cursor — SSE (StreamableHTTP GET endpoint)
     () => {
       const file = path.join(projectPath, ".cursor", "mcp.json");
-      const res = mergeJson(file, SERVER_KEY, launchEntry, "mcpServers");
+      const res = mergeJson(file, SERVER_KEY, sseEntry, "mcpServers");
       track(res.outcome, file);
       if (res.patch) { result.patches = result.patches ?? []; result.patches.push(res.patch); }
     },
@@ -239,7 +243,7 @@ export async function enableMcp(projectPath: string): Promise<SetupResult> {
   }
 
   result.notes.push(
-    "All generated project configs use a Node launcher (.mcp/adhd-developer-launcher.cjs) that resolves npx vs npx.cmd automatically across Windows, Linux, and macOS."
+    `The adhd-developer MCP server uses StreamableHTTP on port ${DEFAULT_PORT}. Claude Code uses type:http, VS Code and Cursor use type:sse (same /mcp endpoint). Gemini CLI, Junie, Codex, and Copilot CLI are configured with the stdio launcher but require a stdio transport mode in the server to work — currently not supported.`
   );
 
   return result;
