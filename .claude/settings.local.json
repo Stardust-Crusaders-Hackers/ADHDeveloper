@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "mcp__hackathon-mode__enable_hackathon_mode",
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npm view *)",
+      "Bash(npm run *)",
+      "Read(//c/Temp/**)",
+      "Read(//c/Temp/mcp-test/**)",
+      "Read(//c/Temp/mcp-test/.vscode/**)",
+      "Read(//c/Temp/mcp-test/.codex/**)",
+      "Bash(echo '{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}} *)",
+      "Bash(node /c/code/MCP/ADHDeveloper/mcpServer/dist/index.js)",
+      "WebSearch",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:www.jetbrains.com)",
+      "WebFetch(domain:junie.jetbrains.com)",
+      "mcp__adhd-developer__agents_list",
+      "mcp__adhd-developer__list_agents",
+      "mcp__adhd-developer__cache_info",
+      "mcp__adhd-developer__flow_state",
+      "mcp__adhd-developer__task_start",
+      "mcp__adhd-developer__task_complete",
+      "mcp__adhd-developer__tasks_active",
+      "PowerShell(cd C:\\\\Users\\\\kwolf\\\\Desktop\\\\UPC\\\\hack2025\\\\ADHDeveloper; git log --oneline -10 -- intelliJPlugin/src/main/kotlin/com/example/mcpassistant/ui/AudiencePanel.kt)",
+      "PowerShell(git checkout *)",
+      "mcp__hackathon-mode__get_mode_status",
+      "mcp__hackathon-mode__time_check",
+      "mcp__adhd-developer__execute_agent"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "hackathon-mode"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "hackathon-mode": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "hackathon-mode@latest"
+      ]
+    },
+    "adhd-developer": {
+      "type": "http",
+      "url": "http://localhost:2999/mcp"
+    }
+  }
+}

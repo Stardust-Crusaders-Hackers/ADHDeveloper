@@ -1,0 +1,24 @@
+<idea-plugin>
+  <id>com.example.mcpassistant</id>
+  <name>ADHDeveloper Stage Mode</name>
+  <version>0.1.0</version>
+  <vendor>ADHDeveloper</vendor>
+  <description>Visualizes AI agents working on your code in real time.
+        Agents appear on a stage, pick up tasks, and celebrate when done.</description>
+  <depends>com.intellij.modules.platform</depends>
+  <extensions defaultExtensionNs="com.intellij">
+    <applicationService serviceImplementation="com.example.mcpassistant.settings.StageSettingsState" />
+    <projectService serviceImplementation="com.example.mcpassistant.services.AgentRegistryService" />
+    <projectService serviceImplementation="com.example.mcpassistant.services.MCPBridgeService" />
+    <projectService serviceImplementation="com.example.mcpassistant.services.ElevenLabsService" />
+    <postStartupActivity implementation="com.example.mcpassistant.plugin.McpInstallStartupActivity" />
+    <toolWindow id="Agent Stage" anchor="bottom" factoryClass="com.example.mcpassistant.plugin.StageToolWindowFactory" icon="/icons/stage.svg" />
+    <applicationConfigurable parentId="tools" instance="com.example.mcpassistant.settings.StageSettingsConfigurable" id="com.example.mcpassistant.settings.StageSettingsConfigurable" displayName="Agent Stage" />
+    <notificationGroup id="AgentStage.Notifications" displayType="BALLOON" />
+  </extensions>
+  <actions>
+    <action id="AgentStage.ToggleStage" class="com.example.mcpassistant.actions.ToggleStageAction" text="Toggle Agent Stage" description="Show or hide the Agent Stage tool window">
+      <add-to-group group-id="ViewMenu" anchor="last" />
+    </action>
+  </actions>
+</idea-plugin>

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "adhd-developer": {
+      "type": "http",
+      "url": "http://localhost:2999/mcp"
+    }
+  }
+}
